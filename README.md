@@ -304,6 +304,53 @@ The code editor is hidden until you want it: open it from the left rail or with
 <kbd>Ctrl</kbd>+<kbd>B</kbd>, and it takes width from the left rather than
 covering the model.
 
+The page uses relative URLs only, so `serve` also works behind a reverse proxy
+that mounts it under a path (`/cad/` → `/`). Load it with the trailing slash.
+
+<details>
+<summary><strong>Many projects on a server (<code>fluidcad hub</code>)</strong></summary>
+
+```bash
+npx fluidcad hub --projects ~/cad --port 3100
+```
+
+Serves the desktop app's start screen at `/` for every subfolder of
+`--projects` that holds an `init.js`. Opening one starts its own engine on
+demand (a `fluidcad serve` bound to loopback) and proxies it at `/p/<name>/`,
+WebSocket included; **New Project** runs `fluidcad init` in a new subfolder.
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--projects <dir>` | Folder whose subfolders are projects | Current directory |
+| `-p, --port <port>` | Port the hub listens on | `3100` |
+| `--idle-minutes <n>` | Stop an engine with no open page after this long (`0` = never) | `30` |
+
+Like `serve`, the hub binds `127.0.0.1` by default and has no authentication.
+Set `FLUIDCAD_SERVER_HOST=0.0.0.0` to expose it (e.g. in a container behind a
+reverse proxy or a private network such as Tailscale); the per-project engines
+stay on loopback either way.
+
+A container image only needs the package and one port:
+
+```dockerfile
+FROM node:22-bookworm-slim
+WORKDIR /opt/fluidcad
+# A local install, so each project's `import 'fluidcad'` resolves by walking up.
+RUN npm init -y >/dev/null && npm install --omit=dev fluidcad \
+  && mkdir projects && chown node:node projects
+ENV PATH=/opt/fluidcad/node_modules/.bin:$PATH FLUIDCAD_SERVER_HOST=0.0.0.0
+USER node
+EXPOSE 3100
+CMD ["fluidcad", "hub", "--projects", "/opt/fluidcad/projects", "--port", "3100"]
+```
+
+Mount your projects at `/opt/fluidcad/projects` and put any HTTP(S) proxy in
+front of port 3100 (Caddy, Traefik, nginx, Tailscale Serve, docktail
+labels such as `docktail.service.port=3100`). The proxy must pass WebSocket
+upgrades through.
+
+</details>
+
 ### 3. Or Use Your Own Editor
 
 Prefer to model with your own editor open beside the viewport? Both extensions

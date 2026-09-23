@@ -36,6 +36,7 @@
     "ui/dist-lib/",
     "mcp/dist/",
     "bin/",
+    "shell/static/start.html",
     "llm-docs/"
   ],
   "exports": {

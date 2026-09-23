@@ -701,7 +701,8 @@
         closeMenu();
         home = state.home || '';
         // One row of recents is enough for a home screen; the freshest four win.
-        const projects = state.projects.slice(0, 4);
+        // A host listing a whole projects folder (`fluidcad hub`) lifts the cap.
+        const projects = state.projects.slice(0, state.limit ?? 4);
         grid.replaceChildren(...projects.map(card));
         empty.hidden = projects.length > 0;
         grid.hidden = projects.length === 0;
