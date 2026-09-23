@@ -90,7 +90,7 @@ export class SweepFeatureService {
   ) {
     const group = navbar.getGroup('create') ?? navbar.addGroup('create', { visible: false, immune: true });
     this.button = new FeatureButton(group, {
-      icon: '/icons/sweep.png',
+      icon: 'icons/sweep.png',
       label: 'Sweep',
       tip: 'Sweep a sketch along a path',
       ariaLabel: 'Sweep a sketch along a path',

@@ -193,7 +193,7 @@ export class JointsPanel {
           <div class="flex-1 min-w-0 flex flex-col leading-tight">
             <span class="flex items-center gap-2 text-sm">
               <span class="shrink-0 inline-block w-2 h-2 rounded-full ${dotColor}"></span>
-              <img src="/icons/joint-${mate.type}.png" ${ICON_IMG_FALLBACK} class="shrink-0 w-5 h-5 object-contain" alt="" />
+              <img src="icons/joint-${mate.type}.png" ${ICON_IMG_FALLBACK} class="shrink-0 w-5 h-5 object-contain" alt="" />
               ${escapeHtml(mate.type)}
               ${mate.replica ? `<span class="text-[10px] text-base-content/40" data-replica-badge="${mate.mateId}" title="Replica — its statement is the replicate() call; edit the seed mate or the replicate statement">⧉</span>` : ''}
             </span>

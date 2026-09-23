@@ -151,7 +151,7 @@ export class SolvedConstraintToolbar {
     wrapper.className = 'relative group shrink-0';
     const btn = document.createElement('button');
     btn.setAttribute('aria-label', label);
-    btn.innerHTML = `<img src="/icons/${iconPng}.png" ${ICON_IMG_FALLBACK} class="${ICON_ENABLED}" alt="" />`;
+    btn.innerHTML = `<img src="icons/${iconPng}.png" ${ICON_IMG_FALLBACK} class="${ICON_ENABLED}" alt="" />`;
     const tip = document.createElement('div');
     tip.className = 'absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded '
       + 'bg-base-300 text-base-content text-xs whitespace-nowrap opacity-0 pointer-events-none '

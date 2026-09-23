@@ -44,7 +44,7 @@ export class MirrorPanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-mirror-panel',
       title: 'Mirror',
-      icon: '/icons/mirror.png',
+      icon: 'icons/mirror.png',
       bodyHtml: `
         <div data-role="tabs" class="join w-full"></div>
         <div data-role="targets-slot"></div>

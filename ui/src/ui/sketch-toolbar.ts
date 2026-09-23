@@ -467,7 +467,7 @@ export class SketchToolbar {
 
   private updateRectButtonDisplay(): void {
     if (this.rectButtonImg) {
-      this.rectButtonImg.src = `/icons/${this.rectRoundedState ? 'rounded-rect' : 'rect'}.png`;
+      this.rectButtonImg.src = `icons/${this.rectRoundedState ? 'rounded-rect' : 'rect'}.png`;
     }
     if (this.rectTooltip) {
       const label = this.rectRoundedState ? 'Rounded Rectangle' : 'Rectangle';
@@ -507,7 +507,7 @@ export class SketchToolbar {
 
     const btn = document.createElement('button');
     btn.className = this.guideModeState ? TOOLBAR_BTN_ACTIVE_STRONG : TOOLBAR_BTN_BASE;
-    btn.innerHTML = `<img src="/icons/guide.png" ${ICON_IMG_FALLBACK} class="${TOOLBAR_BTN_ICON}" alt="" />`
+    btn.innerHTML = `<img src="icons/guide.png" ${ICON_IMG_FALLBACK} class="${TOOLBAR_BTN_ICON}" alt="" />`
       + `<span class="${TOOLBAR_BTN_LABEL}">Guide</span>`;
     btn.addEventListener('click', () => this.onGuidePress());
 
@@ -533,7 +533,7 @@ export class SketchToolbar {
 
     const btn = document.createElement('button');
     btn.className = tool.id === this.activeToolId ? TOOLBAR_BTN_ACTIVE : TOOLBAR_BTN_BASE;
-    btn.innerHTML = `<img src="/icons/${tool.iconPng}.png" ${ICON_IMG_FALLBACK} class="${TOOLBAR_BTN_ICON}" alt="" />`
+    btn.innerHTML = `<img src="icons/${tool.iconPng}.png" ${ICON_IMG_FALLBACK} class="${TOOLBAR_BTN_ICON}" alt="" />`
       + `<span class="${TOOLBAR_BTN_LABEL}">${tool.caption ?? tool.label}</span>`;
     if (tool.id === 'rect') {
       btn.addEventListener('click', () => this.handleRectButtonClick(wrapper));

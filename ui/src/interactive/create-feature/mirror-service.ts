@@ -120,7 +120,7 @@ export class MirrorFeatureService {
     // hides while the exclusive sketch toolbar owns the bar.
     const group = navbar.getGroup('transform') ?? navbar.addGroup('transform', { visible: false });
     this.button = new FeatureButton(group, {
-      icon: '/icons/mirror.png',
+      icon: 'icons/mirror.png',
       label: 'Mirror',
       tip: 'Mirror solids',
       ariaLabel: 'Mirror solids across a plane',

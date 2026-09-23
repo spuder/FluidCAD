@@ -86,7 +86,7 @@ export class RevolveFeatureService {
   ) {
     const group = navbar.getGroup('create') ?? navbar.addGroup('create', { visible: false, immune: true });
     this.button = new FeatureButton(group, {
-      icon: '/icons/revolve.png',
+      icon: 'icons/revolve.png',
       label: 'Revolve',
       tip: 'Revolve a sketch around an axis',
       ariaLabel: 'Revolve a sketch around an axis',

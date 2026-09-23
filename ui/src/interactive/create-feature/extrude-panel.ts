@@ -69,7 +69,7 @@ export class ExtrudePanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-extrude-panel',
       title: 'Extrude',
-      icon: '/icons/extrude.png',
+      icon: 'icons/extrude.png',
       bodyHtml: `
         <div data-role="tabs" class="join w-full"></div>
         <div data-role="profile-slot"></div>

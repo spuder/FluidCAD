@@ -86,7 +86,7 @@ export class ExtrudeFeatureService {
   ) {
     const group = navbar.addGroup('create', { visible: false, immune: true });
     this.button = new FeatureButton(group, {
-      icon: '/icons/extrude.png',
+      icon: 'icons/extrude.png',
       label: 'Extrude',
       tip: 'Extrude a sketch',
       ariaLabel: 'Extrude a sketch',

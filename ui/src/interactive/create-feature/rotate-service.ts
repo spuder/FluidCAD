@@ -119,7 +119,7 @@ export class RotateFeatureService {
     // hides while the exclusive sketch toolbar owns the bar.
     const group = navbar.getGroup('transform') ?? navbar.addGroup('transform', { visible: false });
     this.button = new FeatureButton(group, {
-      icon: '/icons/rotate.png',
+      icon: 'icons/rotate.png',
       label: 'Rotate',
       tip: 'Rotate solids',
       ariaLabel: 'Rotate solids around an axis',

@@ -76,7 +76,7 @@ export class HelixFeatureService {
   ) {
     const group = navbar.getGroup('create') ?? navbar.addGroup('create', { visible: false, immune: true });
     this.button = new FeatureButton(group, {
-      icon: '/icons/helix.png',
+      icon: 'icons/helix.png',
       label: 'Helix',
       tip: 'Build a helix around an axis or on a cylindrical face',
       ariaLabel: 'Build a helix around an axis or on a cylindrical face',

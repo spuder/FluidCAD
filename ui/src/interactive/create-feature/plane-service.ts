@@ -116,7 +116,7 @@ export class PlaneFeatureService {
   ) {
     const group = navbar.getGroup('create') ?? navbar.addGroup('create', { visible: false, immune: true });
     this.button = new FeatureButton(group, {
-      icon: '/icons/plane.png',
+      icon: 'icons/plane.png',
       label: 'Plane',
       tip: 'Create a construction plane',
       ariaLabel: 'Create a construction plane',

@@ -110,7 +110,7 @@ export class ConnectorFeatureService {
     const group = navbar.getGroup('connector')
       ?? navbar.addGroup('connector', { visible: false, mode: 'part' });
     this.button = new FeatureButton(group, {
-      icon: '/icons/mate-connector.png',
+      icon: 'icons/mate-connector.png',
       label: 'Connector',
       tip: 'Add a mate connector',
       ariaLabel: 'Add a named mate connector to the part',

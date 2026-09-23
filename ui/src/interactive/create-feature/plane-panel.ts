@@ -49,7 +49,7 @@ export class PlanePanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-plane-panel',
       title: 'Plane',
-      icon: '/icons/plane.png',
+      icon: 'icons/plane.png',
       bodyHtml: `
         <label class="flex flex-col gap-1.5">
           <span class="text-base-content/70">Type</span>

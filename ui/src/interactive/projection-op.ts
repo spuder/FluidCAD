@@ -38,7 +38,7 @@ export const PROJECTION_OP_SPECS: Record<ProjectionOp, ProjectionOpSpec> = {
   project: {
     title: 'Project',
     editTitle: 'Edit projection',
-    icon: '/icons/projection.png',
+    icon: 'icons/projection.png',
     pickPrompt: 'Pick edges or faces',
     repickPrompt: 'Pick edges or faces to re-source',
     emptyMessage: 'Pick the edges or faces to project.',
@@ -51,7 +51,7 @@ export const PROJECTION_OP_SPECS: Record<ProjectionOp, ProjectionOpSpec> = {
   intersect: {
     title: 'Intersect',
     editTitle: 'Edit intersection',
-    icon: '/icons/intersect.png',
+    icon: 'icons/intersect.png',
     pickPrompt: 'Pick faces',
     repickPrompt: 'Pick faces to re-source',
     emptyMessage: 'Pick the faces to intersect with the sketch plane.',

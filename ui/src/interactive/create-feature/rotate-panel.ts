@@ -56,7 +56,7 @@ export class RotatePanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-rotate-panel',
       title: 'Rotate',
-      icon: '/icons/rotate.png',
+      icon: 'icons/rotate.png',
       bodyHtml: `
         <div data-role="tabs" class="join w-full"></div>
         <div data-role="targets-slot"></div>

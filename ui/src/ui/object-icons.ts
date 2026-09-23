@@ -81,7 +81,7 @@ export function resolveIconName(uniqueType: string | undefined, type: string | u
  * added feature/shape type that predates its artwork). `solid` is a neutral grey
  * cube and is already the catch-all returned by resolveIconName.
  */
-export const DEFAULT_ICON_SRC = '/icons/solid.png';
+export const DEFAULT_ICON_SRC = 'icons/solid.png';
 
 /**
  * Inline `onerror` attribute for icon `<img>` tags built via innerHTML. When the

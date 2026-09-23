@@ -85,7 +85,7 @@ export class HelixPanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-helix-panel',
       title: 'Helix',
-      icon: '/icons/helix.png',
+      icon: 'icons/helix.png',
       bodyHtml: `
         <div data-role="mode-tabs" class="join w-full"></div>
         <div data-role="axis-group" class="flex flex-col gap-1.5">

@@ -105,7 +105,7 @@ export class CopyPanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-copy-panel',
       title: 'Copy',
-      icon: '/icons/copy-linear.png',
+      icon: 'icons/copy-linear.png',
       bodyHtml: `
         <label class="flex flex-col gap-1.5">
           <span class="text-base-content/70">Type</span>

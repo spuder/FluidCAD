@@ -33,7 +33,7 @@ export class WrapPanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-wrap-panel',
       title: 'Wrap',
-      icon: '/icons/wrap.png',
+      icon: 'icons/wrap.png',
       bodyHtml: `
         <div data-role="tabs" class="join w-full"></div>
         <div data-role="sketch-slot"></div>

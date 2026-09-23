@@ -87,7 +87,7 @@ export class AssemblyToolbar {
     button.className = TOOLBAR_BTN_BASE;
     button.setAttribute('aria-label', opts.tip);
     button.innerHTML =
-      `<img src="/icons/${opts.icon}.png" ${ICON_IMG_FALLBACK} class="${TOOLBAR_BTN_ICON}" alt="" />`
+      `<img src="icons/${opts.icon}.png" ${ICON_IMG_FALLBACK} class="${TOOLBAR_BTN_ICON}" alt="" />`
       + `<span class="${TOOLBAR_BTN_LABEL}">${opts.label}</span>`;
     button.addEventListener('click', onClick);
     const wrap = document.createElement('span');

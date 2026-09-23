@@ -66,7 +66,7 @@ export class TextPanel {
   private pendingFont: string | null = null;
 
   constructor(container: HTMLElement) {
-    this.shell = new PanelShell(container, 'fluidcad-text-panel', 'Text', '/icons/text.png');
+    this.shell = new PanelShell(container, 'fluidcad-text-panel', 'Text', 'icons/text.png');
     this.shell.onEscape = () => this.onExit?.();
     this.shell.body.insertAdjacentHTML('beforeend', `
       <label class="flex flex-col gap-1.5">

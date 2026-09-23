@@ -254,7 +254,7 @@ export class ModifyPickService {
         // group's own `visible: false` start.
         kind === 'sketch' || kind === 'shell' ? createHost : group,
         {
-          icon: `/icons/${kind}.png`,
+          icon: `icons/${kind}.png`,
           label: config.label,
           tip: config.buttonTitle,
           ariaLabel: config.buttonTitle,
@@ -1915,7 +1915,7 @@ export class ModifyPickService {
     const host = this.navbar.addGroup('offset', { visible: false });
     const config = FEATURES.offset;
     const button = new FeatureButton(host, {
-      icon: '/icons/offset.png',
+      icon: 'icons/offset.png',
       label: config.label,
       tip: config.buttonTitle,
       ariaLabel: config.buttonTitle,

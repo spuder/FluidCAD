@@ -37,7 +37,7 @@ class ConnectorPropsPanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-connector-props-panel',
       title: 'Connector',
-      icon: '/icons/mate-connector.png',
+      icon: 'icons/mate-connector.png',
       bodyHtml: `
         <label class="flex flex-col gap-1.5"
           title="The identifier the connector registers under — mates reference it as instance.connectors.<name>">
@@ -175,7 +175,7 @@ class ConnectorPropsPanel extends FeaturePanel {
 /**
  * Orchestrates the pen-button flow: fetch the statement's properties, seed
  * the panel beside the mate dialog, and apply the rewrite through
- * `/api/part-connector-props`. One instance serves both mate slots; opening
+ * `api/part-connector-props`. One instance serves both mate slots; opening
  * for another connector re-seeds in place.
  */
 export class ConnectorPropsEditor {

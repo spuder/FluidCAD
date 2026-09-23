@@ -26,7 +26,7 @@ export class PartToolButton {
   }) {
     const group = navbar.getGroup('part') ?? navbar.addGroup('part', { mode: 'part' });
     this.button = new FeatureButton(group, {
-      icon: '/icons/box-blue.png',
+      icon: 'icons/box-blue.png',
       label: 'Part',
       tip: 'Create a new part',
       ariaLabel: 'Create a new part',

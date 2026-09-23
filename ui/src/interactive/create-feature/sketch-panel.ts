@@ -48,7 +48,7 @@ export class SketchStartPanel {
   private sectionViewInput: HTMLInputElement;
 
   constructor(container: HTMLElement) {
-    this.shell = new PanelShell(container, 'fluidcad-sketch-panel', 'Sketch', '/icons/sketch.png');
+    this.shell = new PanelShell(container, 'fluidcad-sketch-panel', 'Sketch', 'icons/sketch.png');
     this.shell.onEscape = () => this.onEscape?.();
     this.shell.body.insertAdjacentHTML('beforeend', `
       <div data-role="target-slot"></div>

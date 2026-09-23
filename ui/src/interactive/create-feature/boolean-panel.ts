@@ -42,7 +42,7 @@ export class BooleanPanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-boolean-panel',
       title: 'Boolean',
-      icon: '/icons/fuse.png',
+      icon: 'icons/fuse.png',
       bodyHtml: `
         <div data-role="tabs" class="join w-full"></div>
         <div data-role="targets-slot"></div>

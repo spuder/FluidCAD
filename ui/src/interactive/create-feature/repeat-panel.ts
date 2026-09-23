@@ -113,7 +113,7 @@ export class RepeatPanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-repeat-panel',
       title: 'Repeat',
-      icon: '/icons/repeat-linear.png',
+      icon: 'icons/repeat-linear.png',
       bodyHtml: `
         <label class="flex flex-col gap-1.5">
           <span class="text-base-content/70">Type</span>

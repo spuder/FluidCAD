@@ -84,7 +84,7 @@ export class MatePanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-mate-panel',
       title: 'Mate',
-      icon: '/icons/joint-fastened.png',
+      icon: 'icons/joint-fastened.png',
       bodyHtml: `
         <label class="flex flex-col gap-1.5" title="The joint type — how the two connectors constrain each other">
           <span class="text-base-content/70">Type</span>

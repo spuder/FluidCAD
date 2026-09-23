@@ -58,7 +58,7 @@ export class ReplicatePanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-replicate-panel',
       title: 'Replicate',
-      icon: '/icons/replicate.png',
+      icon: 'icons/replicate.png',
       exitLabel: 'Cancel',
       bodyHtml: `
         <p data-role="intro" class="text-base-content/60 leading-snug m-0"></p>

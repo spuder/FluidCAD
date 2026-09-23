@@ -67,7 +67,7 @@ export class WrapFeatureService {
   ) {
     const group = navbar.getGroup('create') ?? navbar.addGroup('create', { visible: false, immune: true });
     this.button = new FeatureButton(group, {
-      icon: '/icons/wrap.png',
+      icon: 'icons/wrap.png',
       label: 'Wrap',
       tip: 'Wrap a sketch onto a curved face',
       ariaLabel: 'Wrap a sketch onto a curved face',

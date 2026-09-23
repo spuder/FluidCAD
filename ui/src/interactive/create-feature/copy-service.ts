@@ -118,7 +118,7 @@ export class CopyFeatureService {
     // it hides while the exclusive sketch toolbar owns the bar.
     const group = navbar.getGroup('repeat') ?? navbar.addGroup('repeat', { visible: false });
     this.button = new FeatureButton(group, {
-      icon: '/icons/copy-linear.png',
+      icon: 'icons/copy-linear.png',
       label: 'Copy',
       tip: 'Copy solids',
       ariaLabel: 'Copy solids along an axis or around an axis',

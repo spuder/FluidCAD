@@ -51,7 +51,7 @@ export class RevolvePanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-revolve-panel',
       title: 'Revolve',
-      icon: '/icons/revolve.png',
+      icon: 'icons/revolve.png',
       bodyHtml: `
         <div data-role="tabs" class="join w-full"></div>
         <div data-role="profile-slot"></div>

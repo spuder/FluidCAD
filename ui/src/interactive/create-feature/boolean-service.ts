@@ -86,7 +86,7 @@ export class BooleanFeatureService {
     // the exclusive sketch toolbar owns the bar.
     const group = navbar.addGroup('boolean', { visible: false });
     this.button = new FeatureButton(group, {
-      icon: '/icons/fuse.png',
+      icon: 'icons/fuse.png',
       label: 'Boolean',
       tip: 'Boolean operations',
       ariaLabel: 'Combine solids — fuse, subtract or common',

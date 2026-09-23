@@ -75,7 +75,7 @@ export class SweepPanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-sweep-panel',
       title: 'Sweep',
-      icon: '/icons/sweep.png',
+      icon: 'icons/sweep.png',
       bodyHtml: `
         <div data-role="tabs" class="join w-full"></div>
         <div data-role="profile-slot"></div>
