@@ -694,6 +694,9 @@ currentRail = initialRail;
 // Top application bar (logo, workspace, file tabs) and the secondary tool bar
 // below it (host for conditionally-visible tool groups).
 const topBar = new TopBar(container, {
+  beforeLeave: async () => {
+    await editorSurface?.models.saveAllDirty();
+  },
   // A viewport-only host gets no tab affordances: the handler set is absent,
   // which is what removes them.
   tabs: editorSurfaceEnabled ? {
@@ -820,6 +823,18 @@ globalShortcuts.enable();
  * These also settle the keybindings a browser tab was stealing: Ctrl/Cmd+S no
  * longer offers to save the HTML, and Ctrl+N no longer opens a window.
  */
+// A browser tab closing or reloading over unsaved buffers gets the browser's
+// own "leave site?" prompt. Not in the desktop app: there an unanswered
+// beforeunload silently blocks the window from closing.
+if (!(window as any).fluidcadDesktop) {
+  window.addEventListener('beforeunload', (event) => {
+    if (editorSurface && editorSurface.models.dirtyPaths().length > 0) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  });
+}
+
 installDesktopMenu({
   save: () => void editorSurface?.saveActive(),
   'save-all': () => void editorSurface?.saveAll(),
