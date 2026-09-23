@@ -1,7 +1,7 @@
 import { fork, spawn } from 'child_process';
 import { createServer, request as httpRequest } from 'http';
 import { connect } from 'net';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { findFreePort } from '../lib/server-client.js';
@@ -70,6 +70,24 @@ function listProjects(root, engines, opened) {
   }
   projects.sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt));
   return projects;
+}
+
+/**
+ * Deleting moves the folder to `<projects>/.trash/<name>-<time>` rather than
+ * erasing it: a click in a browser should not be able to lose work for good.
+ * The dot keeps the trash out of the project list.
+ */
+function trashProject(root, name) {
+  const dir = join(root, name);
+  if (!existsSync(join(dir, 'init.js'))) {
+    throw new Error(`No project named "${name}".`);
+  }
+  const trash = join(root, '.trash');
+  mkdirSync(trash, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const target = join(trash, `${name}-${stamp}`);
+  renameSync(dir, target);
+  return target;
 }
 
 function createProject(root, name) {
@@ -274,6 +292,12 @@ const SHELL_SHIM = `<script>
           go(name.trim());
         } catch (err) { fail(err); }
       },
+      forgetLabel: 'Stop engine',
+      async deleteProject(path) {
+        const name = byPath.get(path) ?? path;
+        if (!confirm('Delete project "' + name + '"?\\n\\nIts folder is moved to .trash inside the projects folder.')) { return; }
+        await post('hub/api/delete', { name }).catch(fail);
+      },
       async forget(path) {
         // No recents list on the server: removing a card stops its engine.
         await post('hub/api/stop', { name: byPath.get(path) ?? path }).catch(fail);
@@ -375,7 +399,7 @@ async function runHub(opts) {
       sendJson(res, 200, { home: '', limit: projects.length, projects });
       return;
     }
-    if (req.method === 'POST' && (path === '/hub/api/new' || path === '/hub/api/stop')) {
+    if (req.method === 'POST' && ['/hub/api/new', '/hub/api/stop', '/hub/api/delete'].includes(path)) {
       let body;
       try {
         body = await readJsonBody(req);
@@ -385,6 +409,17 @@ async function runHub(opts) {
       }
       if (!isValidName(body.name)) {
         sendJson(res, 400, { error: 'Use letters, numbers, spaces, ".", "_" or "-" (up to 64), starting with a letter or number.' });
+        return;
+      }
+      if (path === '/hub/api/delete') {
+        pool.stop(body.name);
+        try {
+          const target = trashProject(root, body.name);
+          console.log(`Moved project "${body.name}" to ${target}.`);
+          sendJson(res, 200, { ok: true });
+        } catch (err) {
+          sendJson(res, 404, { error: err.message });
+        }
         return;
       }
       if (path === '/hub/api/stop') {
@@ -408,15 +443,43 @@ async function runHub(opts) {
   }
 
   function proxyHttp(req, res, enginePort, path) {
+    // The project's page itself gets a `fluidcad-home` meta tag pointing back
+    // at the picker (relative, so any outer prefix survives); the page turns
+    // its logo into that link. Asked for uncompressed and unconditionally so
+    // there is a body to edit.
+    const isPage = req.method === 'GET' && (path === '/' || path.startsWith('/?'));
+    const headers = { ...req.headers, host: `127.0.0.1:${enginePort}` };
+    if (isPage) {
+      delete headers['accept-encoding'];
+      delete headers['if-none-match'];
+      delete headers['if-modified-since'];
+    }
     const upstream = httpRequest({
       host: '127.0.0.1',
       port: enginePort,
       method: req.method,
       path,
-      headers: { ...req.headers, host: `127.0.0.1:${enginePort}` },
+      headers,
     }, (upstreamRes) => {
-      res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
-      upstreamRes.pipe(res);
+      const isHtml = String(upstreamRes.headers['content-type'] ?? '').includes('text/html');
+      if (!isPage || !isHtml || upstreamRes.statusCode !== 200) {
+        res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
+        upstreamRes.pipe(res);
+        return;
+      }
+      const chunks = [];
+      upstreamRes.on('data', (chunk) => chunks.push(chunk));
+      upstreamRes.on('end', () => {
+        const html = Buffer.concat(chunks).toString('utf8')
+          .replace(/<head>/i, '<head>\n  <meta name="fluidcad-home" content="../../">');
+        const out = { ...upstreamRes.headers, 'cache-control': 'no-store' };
+        delete out['content-length'];
+        delete out['etag'];
+        delete out['last-modified'];
+        res.writeHead(200, out);
+        res.end(html);
+      });
+      upstreamRes.on('error', () => res.destroy());
     });
     upstream.on('error', (err) => {
       if (!res.headersSent) {

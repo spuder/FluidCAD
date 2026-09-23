@@ -496,15 +496,26 @@
         whenRow.append(when, engineTag(project));
         meta.append(nameRow, path, whenRow);
 
-        const more = moreButton([
+        // A host may relabel "forget" and offer deleting (`fluidcad hub`).
+        const moreItems = [
           {
-            label: 'Remove from recent',
+            label: api.start.forgetLabel ?? 'Remove from recent',
             action: async () => {
               await api.start.forget(project.path);
               await refresh();
             },
           },
-        ]);
+        ];
+        if (api.start.deleteProject) {
+          moreItems.push({
+            label: 'Delete project…',
+            action: async () => {
+              await api.start.deleteProject(project.path);
+              await refresh();
+            },
+          });
+        }
+        const more = moreButton(moreItems);
 
         const open = async () => {
           if (el.classList.contains('busy')) { return; }

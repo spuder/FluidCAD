@@ -317,7 +317,10 @@ npx fluidcad hub --projects ~/cad --port 3100
 Serves the desktop app's start screen at `/` for every subfolder of
 `--projects` that holds an `init.js`. Opening one starts its own engine on
 demand (a `fluidcad serve` bound to loopback) and proxies it at `/p/<name>/`,
-WebSocket included; **New Project** runs `fluidcad init` in a new subfolder.
+WebSocket included; **New Project** runs `fluidcad init` in a new subfolder,
+and **Delete project…** (on a card's menu) moves its folder to
+`<projects>/.trash/`. Inside a project, the FluidCAD logo returns to the
+picker, saving any unsaved files first.
 
 | Flag | Description | Default |
 |------|-------------|---------|
