@@ -146,6 +146,32 @@ describe('CommandPalette', () => {
     expect(rows().map((r) => r.textContent)).toEqual(['Extrude']);
   });
 
+  // The palette's own trigger is a bare letter, so a query containing it has
+  // to reach the search box rather than the shortcut layer. It does because
+  // the input holds focus and ShortcutManager stands down in a text field —
+  // this guards the palette's half of that: it never acts on the key itself.
+  it('lets a query contain the letter that opened it', () => {
+    const p = make([cmd('sweep', 'Sweep'), cmd('shell', 'Shell'), cmd('extrude', 'Extrude')]);
+    p.open();
+
+    press(input(), 's');
+    expect(p.isOpen()).toBe(true);
+
+    type('sh');
+    expect(rows().map((r) => r.textContent)).toEqual(['Shell']);
+    expect(p.isOpen()).toBe(true);
+  });
+
+  it('open() is idempotent — pressing the trigger again keeps it up', () => {
+    const p = make([cmd('line', 'Line')]);
+    p.open();
+    type('li');
+    p.open();
+
+    expect(p.isOpen()).toBe(true);
+    expect(input().value).toBe('li'); // the query survived
+  });
+
   it('toggle() opens when closed and closes when open', () => {
     const p = make([cmd('line', 'Line')]);
     p.toggle();

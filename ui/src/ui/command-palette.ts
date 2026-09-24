@@ -24,11 +24,23 @@ export interface PaletteCommand {
 }
 
 /**
- * The binding that opens the palette — and, handled by the input itself in
- * {@link CommandPalette.onKeyDown}, closes it again. Exported so main.ts
- * registers exactly the key this class listens for.
+ * The key that opens the palette: a bare letter, so it is reachable with the
+ * hand that is not on the mouse — the point of the thing. Registered on both
+ * shortcut managers (see main.ts) so whichever one is live owns it, and
+ * inside a sketch it waits out the chord timeout in case `sy` (Symmetric)
+ * was meant, exactly as `c` waits for `ca`/`cc`/`cl`/`cn`/`cp`.
+ *
+ * Bound to {@link CommandPalette.open}, not a toggle: once the palette is up
+ * the key belongs to the search box, so a query can contain the letter.
  */
-export const COMMAND_PALETTE_SHORTCUT = 'mod+k';
+export const COMMAND_PALETTE_SHORTCUT = 's';
+
+/**
+ * The combo that does the same thing, kept alongside the letter: it is what
+ * every other editor binds this to, and it still works where the letter
+ * cannot — inside a text field, and without waiting on the chord timeout.
+ */
+export const COMMAND_PALETTE_COMBO = 'mod+k';
 
 /**
  * Generous because the list scrolls and the command set is bounded (unlike
