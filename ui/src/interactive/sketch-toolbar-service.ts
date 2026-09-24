@@ -314,12 +314,18 @@ export class SketchToolbarService {
    * is actually being edited (the bar's own visibility), so the palette
    * never lists a tool with nothing for it to draw into.
    */
-  listCommands(): { id: ToolId; label: string; iconPng: string; shortcut?: string; run: () => void }[] {
+  listCommands(): { id: ToolId; label: string; icon: string; detail: string; shortcut?: string; run: () => void }[] {
     if (!this.toolbar.isVisible) {
       return [];
     }
     return this.toolbar.listCommands().map((tool) => ({
-      ...tool,
+      id: tool.id,
+      label: tool.label,
+      icon: `/icons/${tool.iconPng}.png`,
+      // Fillet, Offset, Copy and Mirror each name a solid feature too, and
+      // both are listed while a sketch is open.
+      detail: 'Sketch',
+      shortcut: tool.shortcut,
       run: () => this.toolbar.activateTool(tool.id),
     }));
   }

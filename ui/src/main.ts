@@ -25,6 +25,7 @@ import { EditParamsDialog } from './ui/edit-params-dialog';
 import { HISTORY_SHORTCUTS, HistoryToolbar } from './ui/history-toolbar';
 import { ShortcutManager } from './ui/shortcut-manager';
 import { COMMAND_PALETTE_SHORTCUT, CommandPalette } from './ui/command-palette';
+import { FeatureButton } from './interactive/create-feature/feature-button';
 import { SelectionContextMenu } from './interactive/selection-menu';
 import { ProjectionPickService } from './interactive/projection-pick-service';
 import { SketchToolbarService } from './interactive/sketch-toolbar-service';
@@ -1841,17 +1842,29 @@ sketchService.onConstraintPick = (pick) => {
  * Fusion-style "type a command's name" launcher (#71). Placed here, after
  * `sketchService` exists, rather than up with `globalShortcuts`'
  * declaration: `getCommands` is re-run on every open, so it always reflects
- * what is actually runnable right now — currently the armed sketch's tools,
- * plus Undo/Redo wherever the editor host has declared history support.
- * More sources (feature/assembly toolbars) can feed the same list as they
- * grow one.
+ * what is runnable at that moment.
+ *
+ * Three sources, in the order the list shows them: the sketch tools while a
+ * sketch is open (the innermost context, so first), every feature button the
+ * current workbench is showing — Sketch, Extrude, Fillet, the rest — and
+ * Undo/Redo wherever the editor host has declared history support. The
+ * assembly bar builds its buttons by hand rather than through
+ * `FeatureButton`, so its tools are not listed yet.
  */
 const commandPalette = new CommandPalette(() => [
+  ...sketchService.listCommands(),
+  ...FeatureButton.reachable().map((button) => ({
+    id: `feature:${button.labelText}`,
+    label: button.labelText,
+    icon: button.iconSrc,
+    // Delegated rather than reimplemented: a click runs the owning service's
+    // enter/exit plus every hook wired to it here.
+    run: () => button.click(),
+  })),
   ...(historyAvailable() ? [
     { id: 'undo', label: 'Undo', shortcut: HISTORY_SHORTCUTS.undo, run: () => runEditorHistory('undo') },
     { id: 'redo', label: 'Redo', shortcut: HISTORY_SHORTCUTS.redo, run: () => runEditorHistory('redo') },
   ] : []),
-  ...sketchService.listCommands(),
 ]);
 // A modifier combo rather than a bare letter: globalShortcuts carries combos
 // only (see its declaration) so it never contends with the sketch-mode
