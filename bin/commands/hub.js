@@ -27,6 +27,7 @@ import { readProjectConfig } from '../../server/dist/project-config.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cliEntry = resolve(__dirname, '..', 'fluidcad.js');
 const startPage = resolve(__dirname, '..', '..', 'shell', 'static', 'start.html');
+const uiDist = resolve(__dirname, '..', '..', 'ui', 'dist');
 
 const ENGINE_START_TIMEOUT_MS = 120_000;
 const ENGINE_FIRST_PORT = 3200;
@@ -90,6 +91,20 @@ function trashProject(root, name) {
   return target;
 }
 
+function renameProject(root, name, newName) {
+  const from = join(root, name);
+  const to = join(root, newName);
+  if (!existsSync(join(from, 'init.js'))) {
+    throw new Error(`No project named "${name}".`);
+  }
+  if (existsSync(to)) {
+    throw new Error(`"${newName}" already exists.`);
+  }
+  // Safe to move as a whole: files import each other relatively, and the
+  // saved editor state (.fluidcad/editor-state.json) is workspace-relative.
+  renameSync(from, to);
+}
+
 function createProject(root, name) {
   const dir = join(root, name);
   if (existsSync(join(dir, 'init.js'))) {
@@ -145,6 +160,9 @@ class EnginePool {
 
     engine.ready = (async () => {
       const requested = await findFreePort(ENGINE_FIRST_PORT, 500);
+      if (engine.state === 'stopped') {
+        throw new Error(`The engine for "${name}" was stopped before it started.`);
+      }
       // The engine stays on loopback whatever the hub binds; the hub is its
       // only client.
       const env = { ...process.env };
@@ -215,16 +233,26 @@ class EnginePool {
     return engine;
   }
 
-  stop(name) {
+  /** Resolves once the engine has exited (or after `graceMs`), so its folder can be moved. */
+  stop(name, graceMs = 5_000) {
     const engine = this.engines.get(name);
     if (!engine) {
-      return;
+      return Promise.resolve();
     }
     this.engines.delete(name);
     engine.state = 'stopped';
-    if (engine.child && engine.child.exitCode === null) {
-      engine.child.kill('SIGTERM');
+    const child = engine.child;
+    if (!child || child.exitCode !== null || child.signalCode !== null) {
+      return Promise.resolve();
     }
+    return new Promise((resolvePromise) => {
+      const timer = setTimeout(resolvePromise, graceMs);
+      child.once('exit', () => {
+        clearTimeout(timer);
+        resolvePromise();
+      });
+      child.kill('SIGTERM');
+    });
   }
 
   stopIdle(idleMs) {
@@ -293,6 +321,12 @@ const SHELL_SHIM = `<script>
         } catch (err) { fail(err); }
       },
       forgetLabel: 'Stop engine',
+      async renameProject(path) {
+        const name = byPath.get(path) ?? path;
+        const newName = prompt('Rename project "' + name + '" to:', name);
+        if (!newName || newName.trim() === name) { return; }
+        await post('hub/api/rename', { name, newName: newName.trim() }).catch(fail);
+      },
       async deleteProject(path) {
         const name = byPath.get(path) ?? path;
         if (!confirm('Delete project "' + name + '"?\\n\\nIts folder is moved to .trash inside the projects folder.')) { return; }
@@ -312,10 +346,24 @@ const SHELL_SHIM = `<script>
 </script>
 `;
 
+/** The same artwork the project pages use, served from the built UI. */
+const ICON_FILES = {
+  '/favicon.ico': 'image/x-icon',
+  '/logo.svg': 'image/svg+xml',
+  '/logo.png': 'image/png',
+};
+const ICON_LINKS =
+  '<link rel="icon" type="image/svg+xml" href="logo.svg">' +
+  '<link rel="alternate icon" href="favicon.ico">' +
+  '<link rel="apple-touch-icon" href="logo.png">';
+
 function renderStartPage() {
   // The desktop page has no network access at all; here the bridge is fetch,
   // so the hub's copy may talk to its own origin.
-  const html = readFileSync(startPage, 'utf8').replace("default-src 'none';", "default-src 'none'; connect-src 'self';");
+  const html = readFileSync(startPage, 'utf8')
+    .replace("default-src 'none';", "default-src 'none'; connect-src 'self';")
+    .replace('img-src data: https:;', "img-src 'self' data: https:;")
+    .replace('</title>', '</title>\n    ' + ICON_LINKS);
   const marker = '<script>';
   const at = html.lastIndexOf(marker);
   if (at === -1) {
@@ -399,7 +447,7 @@ async function runHub(opts) {
       sendJson(res, 200, { home: '', limit: projects.length, projects });
       return;
     }
-    if (req.method === 'POST' && ['/hub/api/new', '/hub/api/stop', '/hub/api/delete'].includes(path)) {
+    if (req.method === 'POST' && ['/hub/api/new', '/hub/api/stop', '/hub/api/delete', '/hub/api/rename'].includes(path)) {
       let body;
       try {
         body = await readJsonBody(req);
@@ -411,8 +459,27 @@ async function runHub(opts) {
         sendJson(res, 400, { error: 'Use letters, numbers, spaces, ".", "_" or "-" (up to 64), starting with a letter or number.' });
         return;
       }
+      if (path === '/hub/api/rename') {
+        if (!isValidName(body.newName)) {
+          sendJson(res, 400, { error: 'Use letters, numbers, spaces, ".", "_" or "-" (up to 64), starting with a letter or number.' });
+          return;
+        }
+        await pool.stop(body.name);
+        try {
+          renameProject(root, body.name, body.newName);
+          if (opened.has(body.name)) {
+            opened.set(body.newName, opened.get(body.name));
+            opened.delete(body.name);
+          }
+          console.log(`Renamed project "${body.name}" to "${body.newName}".`);
+          sendJson(res, 200, { ok: true });
+        } catch (err) {
+          sendJson(res, 409, { error: err.message });
+        }
+        return;
+      }
       if (path === '/hub/api/delete') {
-        pool.stop(body.name);
+        await pool.stop(body.name);
         try {
           const target = trashProject(root, body.name);
           console.log(`Moved project "${body.name}" to ${target}.`);
@@ -423,7 +490,7 @@ async function runHub(opts) {
         return;
       }
       if (path === '/hub/api/stop') {
-        pool.stop(body.name);
+        await pool.stop(body.name);
         sendJson(res, 200, { ok: true });
         return;
       }
@@ -505,6 +572,16 @@ async function runHub(opts) {
         res.end(renderStartPage());
       } catch (err) {
         sendJson(res, 500, { error: err.message });
+      }
+      return;
+    }
+    if (Object.hasOwn(ICON_FILES, path)) {
+      try {
+        const body = readFileSync(resolve(uiDist, '.' + path));
+        res.writeHead(200, { 'Content-Type': ICON_FILES[path], 'Cache-Control': 'public, max-age=86400' });
+        res.end(body);
+      } catch {
+        sendJson(res, 404, { error: 'Not found.' });
       }
       return;
     }

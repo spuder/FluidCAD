@@ -318,9 +318,16 @@ Serves the desktop app's start screen at `/` for every subfolder of
 `--projects` that holds an `init.js`. Opening one starts its own engine on
 demand (a `fluidcad serve` bound to loopback) and proxies it at `/p/<name>/`,
 WebSocket included; **New Project** runs `fluidcad init` in a new subfolder,
-and **Delete project…** (on a card's menu) moves its folder to
-`<projects>/.trash/`. Inside a project, the FluidCAD logo returns to the
-picker, saving any unsaved files first.
+**Rename project…** renames its folder, and **Delete project…** moves its
+folder to `<projects>/.trash/` (both on a card's menu). Inside a project, the
+FluidCAD logo returns to the picker, saving any unsaved files first.
+
+Several devices can have the same project open. A file saved on one reloads
+on the others; one with unsaved edits there gets a warning instead, and
+saving it asks whether to overwrite the newer version or load it. Unsaved
+edits are also saved when the page is hidden or closed, since mobile Safari
+gives no chance to ask. The 3D view is one scene per project, so switching
+files on one device switches it on the others.
 
 | Flag | Description | Default |
 |------|-------------|---------|

@@ -496,7 +496,7 @@
         whenRow.append(when, engineTag(project));
         meta.append(nameRow, path, whenRow);
 
-        // A host may relabel "forget" and offer deleting (`fluidcad hub`).
+        // A host may relabel "forget" and offer renaming and deleting (`fluidcad hub`).
         const moreItems = [
           {
             label: api.start.forgetLabel ?? 'Remove from recent',
@@ -506,6 +506,15 @@
             },
           },
         ];
+        if (api.start.renameProject) {
+          moreItems.push({
+            label: 'Rename project…',
+            action: async () => {
+              await api.start.renameProject(project.path);
+              await refresh();
+            },
+          });
+        }
         if (api.start.deleteProject) {
           moreItems.push({
             label: 'Delete project…',
