@@ -24,7 +24,7 @@ import { InsertPartDialog } from './ui/insert-part/insert-part-dialog';
 import { EditParamsDialog } from './ui/edit-params-dialog';
 import { HISTORY_SHORTCUTS, HistoryToolbar } from './ui/history-toolbar';
 import { ShortcutManager } from './ui/shortcut-manager';
-import { CommandPalette } from './ui/command-palette';
+import { COMMAND_PALETTE_SHORTCUT, CommandPalette } from './ui/command-palette';
 import { SelectionContextMenu } from './interactive/selection-menu';
 import { ProjectionPickService } from './interactive/projection-pick-service';
 import { SketchToolbarService } from './interactive/sketch-toolbar-service';
@@ -1853,11 +1853,12 @@ const commandPalette = new CommandPalette(() => [
   ] : []),
   ...sketchService.listCommands(),
 ]);
-// `mod+k` rather than a bare letter: globalShortcuts carries modifier combos
+// A modifier combo rather than a bare letter: globalShortcuts carries combos
 // only (see its declaration) so it never contends with the sketch-mode
-// manager's letter chords, and it's the conventional command-palette key
-// anyway (VS Code, Slack, Linear, GitHub all bind it the same way).
-globalShortcuts.register('mod+k', () => commandPalette.toggle());
+// manager's letter chords, and mod+k is the conventional command-palette key
+// anyway (VS Code, Slack, Linear, GitHub all bind it the same way). Closing
+// again is the palette's own job — this manager stands down inside its input.
+globalShortcuts.register(COMMAND_PALETTE_SHORTCUT, () => commandPalette.toggle());
 
 const modifyService = new ModifyPickService(container, viewer, navbar, {
   // Hand the current highlight over as the tool's initial input: whatever the

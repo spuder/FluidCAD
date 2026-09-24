@@ -17,7 +17,19 @@ export interface PaletteCommand {
   run(): void;
 }
 
-const MAX_RESULTS = 20;
+/**
+ * The binding that opens the palette — and, handled by the input itself in
+ * {@link CommandPalette.onKeyDown}, closes it again. Exported so main.ts
+ * registers exactly the key this class listens for.
+ */
+export const COMMAND_PALETTE_SHORTCUT = 'mod+k';
+
+/**
+ * Generous because the list scrolls and the command set is bounded (unlike
+ * quick-open's, which filters a workspace of unknown size) — a cap tight
+ * enough to bite would silently drop commands rather than shorten a list.
+ */
+const MAX_RESULTS = 50;
 
 /**
  * The Fusion-style "type the tool's name" menu (issue #71): press a key to
@@ -110,6 +122,16 @@ export class CommandPalette {
   };
 
   private onKeyDown(event: KeyboardEvent, list: HTMLElement): void {
+    // The opening combo, handled here rather than by the ShortcutManager that
+    // registered it: that manager stands down inside an `<input>`
+    // (`isEditableTarget`), so while the palette holds focus the key would
+    // otherwise be neither acted on nor consumed — leaving the browser to
+    // take it for the address bar, or the VSCode host to open a Ctrl+K chord.
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      this.close();
+      return;
+    }
     if (event.key === 'Escape') {
       event.preventDefault();
       this.close();
@@ -173,10 +195,12 @@ export class CommandPalette {
       'w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm ' +
       (highlighted ? 'bg-base-content/10 text-base-content' : 'text-base-content/70');
 
+    // Sized well above quick-open's 3.5: that list draws inline SVG, these are
+    // the toolbar's PNGs, authored for its w-7 buttons and muddy when halved.
     const icon = document.createElement('span');
-    icon.className = 'shrink-0 size-3.5 flex items-center justify-center';
+    icon.className = 'shrink-0 size-5 flex items-center justify-center';
     if (command.iconPng) {
-      icon.innerHTML = `<img src="/icons/${command.iconPng}.png" ${ICON_IMG_FALLBACK} class="size-3.5" alt="" />`;
+      icon.innerHTML = `<img src="/icons/${command.iconPng}.png" ${ICON_IMG_FALLBACK} class="size-5 object-contain" alt="" />`;
     }
     row.appendChild(icon);
 

@@ -202,9 +202,14 @@ export class SketchToolbar {
     return out;
   }
 
-  /** Arm or disarm `toolId` — the same toggle a click or its chord triggers. */
+  /**
+   * Arm `toolId` outright — never a toggle. A tool reached by name from the
+   * command palette should end up armed whether or not it already was;
+   * toggling belongs to the click and the chord, which are aimed at a button
+   * whose armed state the user can see.
+   */
   activateTool(toolId: ToolId): void {
-    this.handleToolClick(toolId);
+    this.onToolSelect(toolId === 'rect' ? this.effectiveRectToolId() : toolId);
   }
 
   setActiveTool(toolId: ToolId | null): void {
