@@ -72,8 +72,32 @@ export function readWorkspaceFile(path: string): Promise<FileContents> {
   return request(`api/files/read?path=${encodeURIComponent(path)}`);
 }
 
-export function writeWorkspaceFile(path: string, content: string): Promise<WorkspaceFileEntry> {
-  return post('api/files/write', { path, content });
+export type WriteOptions = {
+  /**
+   * The mtime this page last read or wrote. The server refuses with 409 when
+   * the disk has moved on since (see {@link isWriteConflict}); omit to force.
+   */
+  expectedMtimeMs?: number;
+  /** Let the request outlive the page (a save on `pagehide`). Small bodies only. */
+  keepalive?: boolean;
+};
+
+/** The browser caps a keepalive request's body at 64 KiB. */
+const KEEPALIVE_MAX_BYTES = 60 * 1024;
+
+export function writeWorkspaceFile(path: string, content: string, options: WriteOptions = {}): Promise<WorkspaceFileEntry> {
+  const body = JSON.stringify({ path, content, expectedMtimeMs: options.expectedMtimeMs });
+  return request('api/files/write', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body,
+    keepalive: options.keepalive === true && body.length <= KEEPALIVE_MAX_BYTES,
+  });
+}
+
+/** A save refused because the file changed on disk since this page loaded it. */
+export function isWriteConflict(err: unknown): boolean {
+  return err instanceof FileRequestError && err.status === 409;
 }
 
 /** Render this file as the current model — the scene follows. */

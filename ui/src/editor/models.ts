@@ -3,6 +3,7 @@ import {
   listWorkspaceFiles,
   readWorkspaceFile,
   writeWorkspaceFile,
+  isWriteConflict,
   type FileKind,
   type WorkspaceFileEntry,
 } from './editor-api';
@@ -35,6 +36,28 @@ export type ModelEntry = {
 };
 
 type DirtyListener = (dirtyPaths: string[]) => void;
+
+/**
+ * What to do with a save the server refused because the file changed on disk
+ * since this page loaded it: write over it, drop the buffer for the disk's
+ * version, or keep the buffer unsaved.
+ */
+export type SaveConflictChoice = 'overwrite' | 'reload' | 'keep';
+
+export type SaveOptions = {
+  /** Skip the conflict check and write over whatever is on disk. */
+  force?: boolean;
+  /** The page is going away: let the request outlive it, and never ask. */
+  keepalive?: boolean;
+};
+
+/** A save the user chose not to complete; the buffer stays dirty. */
+export class SaveConflictError extends Error {
+  constructor(readonly relPath: string) {
+    super(`${relPath} changed on disk; your changes are still unsaved.`);
+    this.name = 'SaveConflictError';
+  }
+}
 
 export class WorkspaceModels {
   private readonly entries = new Map<string, ModelEntry>();
@@ -149,7 +172,14 @@ export class WorkspaceModels {
     }
   }
 
-  async save(absPath: string): Promise<void> {
+  /**
+   * Asked when a save finds the file changed on disk since this page loaded
+   * it (another tab or device, an agent, `git`). Without one, the save fails
+   * and the buffer stays dirty.
+   */
+  conflictResolver: ((relPath: string) => Promise<SaveConflictChoice>) | null = null;
+
+  async save(absPath: string, options: SaveOptions = {}): Promise<void> {
     const entry = this.entries.get(absPath);
     if (!entry) {
       return;
@@ -157,7 +187,30 @@ export class WorkspaceModels {
     // Captured before the write: a keystroke landing mid-request must stay
     // dirty rather than being marked saved by a stale version id.
     const version = entry.model.getVersionId();
-    const written = await writeWorkspaceFile(entry.relPath, entry.model.getValue());
+    let written: WorkspaceFileEntry;
+    try {
+      written = await writeWorkspaceFile(entry.relPath, entry.model.getValue(), {
+        expectedMtimeMs: options.force ? undefined : entry.mtimeMs,
+        keepalive: options.keepalive,
+      });
+    } catch (err) {
+      if (!isWriteConflict(err) || options.keepalive || !this.conflictResolver) {
+        throw err;
+      }
+      const choice = await this.conflictResolver(entry.relPath);
+      if (choice === 'overwrite') {
+        return this.save(absPath, { force: true });
+      }
+      if (choice === 'reload') {
+        const contents = await readWorkspaceFile(entry.relPath);
+        applyTextAsSingleEdit(entry.model, contents.content);
+        entry.mtimeMs = contents.mtimeMs;
+        this.savedVersions.set(absPath, entry.model.getVersionId());
+        this.notifyDirty();
+        return;
+      }
+      throw new SaveConflictError(entry.relPath);
+    }
     entry.mtimeMs = written.mtimeMs;
     this.savedVersions.set(absPath, version);
     this.notifyDirty();
@@ -174,8 +227,19 @@ export class WorkspaceModels {
     this.notifyDirty();
   }
 
-  async saveAllDirty(): Promise<void> {
-    await Promise.all(this.dirtyPaths().map((absPath) => this.save(absPath)));
+  /**
+   * Sequential, so conflict prompts come one at a time; stops at the first
+   * failure. A keepalive save (the page is going away) never prompts and
+   * can't wait, so those all go out at once.
+   */
+  async saveAllDirty(options: SaveOptions = {}): Promise<void> {
+    if (options.keepalive) {
+      await Promise.allSettled(this.dirtyPaths().map((absPath) => this.save(absPath, options)));
+      return;
+    }
+    for (const absPath of this.dirtyPaths()) {
+      await this.save(absPath, options);
+    }
   }
 
   /**

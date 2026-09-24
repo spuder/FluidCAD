@@ -280,6 +280,10 @@ export class EditorHost {
   private afterBufferChanged(entry: ModelEntry): void {
     void this.deps.models.save(entry.absPath).catch((err) => {
       console.warn(`FluidCAD: could not save ${entry.relPath}:`, err);
+      // The edit is on screen and in the buffer but not on disk; say so
+      // rather than letting the user believe it landed.
+      const message = err instanceof Error ? err.message : String(err);
+      this.deps.onError?.(`Could not save ${entry.relPath}: ${message}`);
     });
     // Immediate, not debounced: the edit came from a click on the viewport and
     // the viewport is what has to answer it. VS Code's `updateLiveCode` clears

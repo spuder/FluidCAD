@@ -86,6 +86,18 @@ export class EditorSurface {
       onBreakpointsChanged: (absPath) => this.breakpoints.refresh(absPath),
       onError: (message) => deps.onEditRefused?.(message),
     });
+    this.models.conflictResolver = async (relPath) => {
+      if (window.confirm(
+        `${relPath} was changed on disk since you opened it (another tab or device, or another tool, saved it).\n\n` +
+        'OK: overwrite it with your version.\nCancel: choose whether to reload it instead.',
+      )) {
+        return 'overwrite';
+      }
+      if (window.confirm(`Discard your unsaved changes to ${relPath} and load the version on disk?\n\nCancel keeps your changes, unsaved.`)) {
+        return 'reload';
+      }
+      return 'keep';
+    };
     this.models.onDirtyChange((dirtyPaths) => {
       this.renderTabs();
       // The MCP source tools read this before writing, so an agent never
@@ -605,6 +617,12 @@ export class EditorSurface {
     this.breakpoints.refresh(event.absPath);
   }
 
+  /** A save that didn't happen is said out loud: the buffer is still unsaved. */
+  reportSaveFailure(err: unknown): void {
+    const message = err instanceof Error ? err.message : String(err);
+    this.deps.onEditRefused?.(`Not saved: ${message}`);
+  }
+
   /** Re-announce after a reconnect — the server forgets hosts on disconnect. */
   onSocketOpen(): void {
     this.deps.send({ type: 'editor-hello', editor: 'monaco', capabilities: { undoRedo: true } });
@@ -616,7 +634,7 @@ export class EditorSurface {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       const absPath = this.activePath;
       if (absPath) {
-        void this.models.save(absPath);
+        void this.models.save(absPath).catch((err) => this.reportSaveFailure(err));
       }
     });
     // Typing re-renders the scene, the way saving a buffer does in VS Code.

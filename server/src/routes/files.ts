@@ -74,6 +74,14 @@ function isSameFile(a: string, b: string): boolean {
 }
 
 /** Answers a thrown `WorkspacePathError` with 403 and anything else with 500. */
+function statIfExists(absPath: string): fs.Stats | null {
+  try {
+    return fs.statSync(absPath);
+  } catch {
+    return null;
+  }
+}
+
 function respondToError(res: Response, err: unknown): void {
   if (err instanceof WorkspacePathError) {
     res.status(403).json({ error: err.message });
@@ -123,8 +131,24 @@ export function createFilesRouter(deps: FilesRouterDeps): Router {
       res.status(400).json({ error: 'Invalid request body: content must be a string.' });
       return;
     }
+    const { expectedMtimeMs } = req.body ?? {};
     try {
       const file = resolveWorkspaceFile(workspacePath, req.body?.path);
+      // Optimistic concurrency: a page that says which version it edited
+      // (the mtime it last read or wrote) is refused when the disk has moved
+      // on since — another tab or device saved, an agent wrote through MCP —
+      // instead of silently overwriting that change. Omit it to force.
+      if (typeof expectedMtimeMs === 'number') {
+        const current = statIfExists(file.absPath);
+        if (current && current.mtimeMs !== expectedMtimeMs) {
+          res.status(409).json({
+            error: `${file.relPath} changed on disk since it was loaded.`,
+            conflict: true,
+            mtimeMs: current.mtimeMs,
+          });
+          return;
+        }
+      }
       fs.mkdirSync(path.dirname(file.absPath), { recursive: true });
       fs.writeFileSync(file.absPath, content, 'utf8');
       deps.onWrite?.(file.absPath, content);

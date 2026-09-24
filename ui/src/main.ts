@@ -833,11 +833,28 @@ if (!(window as any).fluidcadDesktop) {
       event.returnValue = '';
     }
   });
+
+  // Mobile browsers (iPad Safari in particular) rarely fire beforeunload:
+  // a tab closed from the switcher, or discarded in the background, just
+  // goes. Hiding is the last moment the page reliably gets, so unsaved
+  // buffers are written then — keepalive, so the request outlives the page,
+  // and never over a newer version on disk (a conflict stays unsaved).
+  const saveOnHide = () => {
+    if (editorSurface && editorSurface.models.dirtyPaths().length > 0) {
+      void editorSurface.models.saveAllDirty({ keepalive: true });
+    }
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      saveOnHide();
+    }
+  });
+  window.addEventListener('pagehide', saveOnHide);
 }
 
 installDesktopMenu({
-  save: () => void editorSurface?.saveActive(),
-  'save-all': () => void editorSurface?.saveAll(),
+  save: () => void editorSurface?.saveActive().catch((err) => editorSurface?.reportSaveFailure(err)),
+  'save-all': () => void editorSurface?.saveAll().catch((err) => editorSurface?.reportSaveFailure(err)),
   'new-file': () => withEditorSurface((surface) => surface.showQuickOpen(topBar.tabAddAnchor)),
   'quick-open': () => withEditorSurface((surface) => surface.showQuickOpen(topBar.tabAddAnchor)),
   'toggle-editor': () => toggleEditorPane(),
