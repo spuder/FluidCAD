@@ -186,6 +186,27 @@ export class SketchToolbar {
     return this.visible;
   }
 
+  /**
+   * Every drawing/edit tool this bar can arm, flattened out of
+   * {@link TOOL_LAYOUT} in its declared order — the command palette's source
+   * for the sketch tools it lists while a sketch is active, so a tool's
+   * label, icon and chord live in exactly one place.
+   */
+  listCommands(): { id: ToolId; label: string; iconPng: string; shortcut?: string }[] {
+    const out: { id: ToolId; label: string; iconPng: string; shortcut?: string }[] = [];
+    for (const entry of TOOL_LAYOUT) {
+      for (const tool of isGroup(entry) ? entry.tools : [entry]) {
+        out.push({ id: tool.id, label: tool.label, iconPng: tool.iconPng, shortcut: TOOL_SHORTCUTS[tool.id] });
+      }
+    }
+    return out;
+  }
+
+  /** Arm or disarm `toolId` — the same toggle a click or its chord triggers. */
+  activateTool(toolId: ToolId): void {
+    this.handleToolClick(toolId);
+  }
+
   setActiveTool(toolId: ToolId | null): void {
     if (this.activeToolId === toolId) {
       return;

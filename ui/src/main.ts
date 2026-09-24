@@ -24,6 +24,7 @@ import { InsertPartDialog } from './ui/insert-part/insert-part-dialog';
 import { EditParamsDialog } from './ui/edit-params-dialog';
 import { HISTORY_SHORTCUTS, HistoryToolbar } from './ui/history-toolbar';
 import { ShortcutManager } from './ui/shortcut-manager';
+import { CommandPalette } from './ui/command-palette';
 import { SelectionContextMenu } from './interactive/selection-menu';
 import { ProjectionPickService } from './interactive/projection-pick-service';
 import { SketchToolbarService } from './interactive/sketch-toolbar-service';
@@ -1835,6 +1836,29 @@ sketchService.onConstraintPick = (pick) => {
     currentRail.timeline.setPickedFeature(pick.objId);
   }
 };
+
+/**
+ * Fusion-style "type a command's name" launcher (#71). Placed here, after
+ * `sketchService` exists, rather than up with `globalShortcuts`'
+ * declaration: `getCommands` is re-run on every open, so it always reflects
+ * what is actually runnable right now — currently the armed sketch's tools,
+ * plus Undo/Redo wherever the editor host has declared history support.
+ * More sources (feature/assembly toolbars) can feed the same list as they
+ * grow one.
+ */
+const commandPalette = new CommandPalette(() => [
+  ...(historyAvailable() ? [
+    { id: 'undo', label: 'Undo', shortcut: HISTORY_SHORTCUTS.undo, run: () => runEditorHistory('undo') },
+    { id: 'redo', label: 'Redo', shortcut: HISTORY_SHORTCUTS.redo, run: () => runEditorHistory('redo') },
+  ] : []),
+  ...sketchService.listCommands(),
+]);
+// `mod+k` rather than a bare letter: globalShortcuts carries modifier combos
+// only (see its declaration) so it never contends with the sketch-mode
+// manager's letter chords, and it's the conventional command-palette key
+// anyway (VS Code, Slack, Linear, GitHub all bind it the same way).
+globalShortcuts.register('mod+k', () => commandPalette.toggle());
+
 const modifyService = new ModifyPickService(container, viewer, navbar, {
   // Hand the current highlight over as the tool's initial input: whatever the
   // user already clicked (measure owns that selection) seeds the pick set.

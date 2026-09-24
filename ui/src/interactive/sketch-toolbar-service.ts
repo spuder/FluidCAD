@@ -309,6 +309,21 @@ export class SketchToolbarService {
     return this.activeDrawingTool !== null;
   }
 
+  /**
+   * The sketch tools the command palette should offer — only while a sketch
+   * is actually being edited (the bar's own visibility), so the palette
+   * never lists a tool with nothing for it to draw into.
+   */
+  listCommands(): { id: ToolId; label: string; iconPng: string; shortcut?: string; run: () => void }[] {
+    if (!this.toolbar.isVisible) {
+      return [];
+    }
+    return this.toolbar.listCommands().map((tool) => ({
+      ...tool,
+      run: () => this.toolbar.activateTool(tool.id),
+    }));
+  }
+
   /** The op dialog (fillet, offset, copy, mirror, split, trim) of the currently armed toolbar tool. */
   private activeOpService(): SketchOpDialog | undefined {
     const tool = this.toolbar.activeTool;
