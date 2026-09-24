@@ -310,6 +310,26 @@ export class SketchToolbarService {
   }
 
   /**
+   * Whether the sketch toolbar — and with it this service's shortcut manager
+   * — is live. An app-wide letter binding has to stand down on the global
+   * manager exactly while this is true, or the two both match it and it
+   * fires twice.
+   */
+  get isSketchActive(): boolean {
+    return this.toolbar.isVisible;
+  }
+
+  /**
+   * Bind a key on the sketch-mode manager. For shortcuts that hold app-wide
+   * and so must exist on both managers: registering here lets this one
+   * resolve the key against the sketch chords that share its prefix, rather
+   * than the global manager firing underneath them.
+   */
+  registerShortcut(keys: string, action: () => void): void {
+    this.shortcuts.register(keys, action);
+  }
+
+  /**
    * The sketch tools the command palette should offer — only while a sketch
    * is actually being edited (the bar's own visibility), so the palette
    * never lists a tool with nothing for it to draw into.

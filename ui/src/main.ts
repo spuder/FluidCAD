@@ -24,7 +24,7 @@ import { InsertPartDialog } from './ui/insert-part/insert-part-dialog';
 import { EditParamsDialog } from './ui/edit-params-dialog';
 import { HISTORY_SHORTCUTS, HistoryToolbar } from './ui/history-toolbar';
 import { ShortcutManager } from './ui/shortcut-manager';
-import { COMMAND_PALETTE_SHORTCUT, CommandPalette } from './ui/command-palette';
+import { COMMAND_PALETTE_COMBO, COMMAND_PALETTE_SHORTCUT, CommandPalette } from './ui/command-palette';
 import { FeatureButton } from './interactive/create-feature/feature-button';
 import { SelectionContextMenu } from './interactive/selection-menu';
 import { ProjectionPickService } from './interactive/projection-pick-service';
@@ -838,9 +838,11 @@ const partTool = new PartToolButton(navbar, {
 });
 
 /**
- * Shortcuts that hold in every mode and both workbenches. Letter chords stay
- * on the sketch-mode manager (sketch-toolbar-service) — this one carries
- * modifier combos only, so the two never contend for a key. Undo/Redo bind
+ * Shortcuts that hold in every mode and both workbenches. Nearly all of the
+ * letter chords stay on the sketch-mode manager (sketch-toolbar-service), so
+ * the two rarely contend for a key; the one exception is the command
+ * palette's letter, which means the same thing everywhere and so is
+ * registered on both, guarded so only one of them is ever live. Undo/Redo bind
  * only while the editor host has declared the capability: without it the
  * keys are not consumed, so the host bridge (VSCode) still sees them. A
  * focused field — the code editor included — keeps its native history.
@@ -1866,12 +1868,31 @@ const commandPalette = new CommandPalette(() => [
     { id: 'redo', label: 'Redo', shortcut: HISTORY_SHORTCUTS.redo, run: () => runEditorHistory('redo') },
   ] : []),
 ]);
-// A modifier combo rather than a bare letter: globalShortcuts carries combos
-// only (see its declaration) so it never contends with the sketch-mode
-// manager's letter chords, and mod+k is the conventional command-palette key
-// anyway (VS Code, Slack, Linear, GitHub all bind it the same way). Closing
-// again is the palette's own job — this manager stands down inside its input.
-globalShortcuts.register(COMMAND_PALETTE_SHORTCUT, () => commandPalette.toggle());
+/**
+ * The palette's key lives on both managers, one letter with one meaning
+ * everywhere — a bare letter because the whole point is reaching it without
+ * taking the other hand off the mouse.
+ *
+ * It cannot simply sit on the global manager: both listen on the window at
+ * once, so a letter registered there as well as in the sketcher would fire
+ * twice, and the sketcher owns `sy` (Symmetric), which shares this key's
+ * prefix. So the sketch-mode manager takes it while a sketch is open — it
+ * can weigh `s` against `sy` the way it already weighs `c` against `ca` —
+ * and the global one stands down for exactly that span.
+ */
+// Opens, never toggles. While the palette is up its input holds focus, so
+// this key reaches the search box rather than the shortcut layer — typing
+// "sweep" or "shell" works — and binding it to a toggle would only mean that
+// if focus ever slipped out, the letter closed the palette instead. Escape,
+// a click outside, or the combo below close it.
+globalShortcuts.register(COMMAND_PALETTE_SHORTCUT, () => commandPalette.open(), {
+  when: () => !sketchService.isSketchActive,
+});
+sketchService.registerShortcut(COMMAND_PALETTE_SHORTCUT, () => commandPalette.open());
+// The combo alongside it: what every other editor uses, and the only one of
+// the two that works from inside a text field. Closing again is the palette's
+// own job — this manager stands down inside its input.
+globalShortcuts.register(COMMAND_PALETTE_COMBO, () => commandPalette.toggle());
 
 const modifyService = new ModifyPickService(container, viewer, navbar, {
   // Hand the current highlight over as the tool's initial input: whatever the

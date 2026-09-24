@@ -49,7 +49,9 @@ export const CONSTRAINT_SHORTCUTS: Record<ConstraintButtonId, string> = {
   concentric: 'cn',
   collinear: 'cl',
   midpoint: 'mp',
-  symmetric: 's',
+  // Two letters like every other multi-word constraint (pa, pe, cc, cn, cl,
+  // mp): the bare `s` it used to hold is the command palette's, app-wide.
+  symmetric: 'sy',
   fix: 'fx',
   dimension: 'd',
   angle: 'da',
