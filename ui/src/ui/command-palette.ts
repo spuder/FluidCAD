@@ -10,8 +10,14 @@ import { formatShortcut } from './shortcut-manager';
 export interface PaletteCommand {
   id: string;
   label: string;
-  /** PNG basename under `/icons`, the same artwork the toolbar buttons use. Absent: a blank slot, so rows still align. */
-  iconPng?: string;
+  /** Icon URL — the same artwork the toolbar button uses. Absent: a blank slot, so rows still align. */
+  icon?: string;
+  /**
+   * Which bench the command belongs to, shown muted after the label. Only
+   * worth setting where a bare label would be ambiguous: Fillet, Offset,
+   * Copy and Mirror all name both a sketch tool and a solid feature.
+   */
+  detail?: string;
   /** A {@link ShortcutManager} binding string (`'c'`, `'mod+z'`, …), shown formatted on the row. */
   shortcut?: string;
   run(): void;
@@ -199,14 +205,20 @@ export class CommandPalette {
     // the toolbar's PNGs, authored for its w-7 buttons and muddy when halved.
     const icon = document.createElement('span');
     icon.className = 'shrink-0 size-5 flex items-center justify-center';
-    if (command.iconPng) {
-      icon.innerHTML = `<img src="/icons/${command.iconPng}.png" ${ICON_IMG_FALLBACK} class="size-5 object-contain" alt="" />`;
+    if (command.icon) {
+      icon.innerHTML = `<img src="${command.icon}" ${ICON_IMG_FALLBACK} class="size-5 object-contain" alt="" />`;
     }
     row.appendChild(icon);
 
     const label = document.createElement('span');
     label.className = 'flex-1 min-w-0 truncate';
     label.textContent = command.label;
+    if (command.detail) {
+      const detail = document.createElement('span');
+      detail.className = 'ml-1.5 text-xs text-base-content/40';
+      detail.textContent = command.detail;
+      label.appendChild(detail);
+    }
     row.appendChild(label);
 
     if (command.shortcut) {

@@ -13,6 +13,19 @@ import { TOOLBAR_BTN_ACTIVE, TOOLBAR_BTN_BASE, TOOLBAR_BTN_ICON, TOOLBAR_BTN_LAB
  * service's coordination then runs unchanged whichever surface was clicked.
  */
 export class FeatureButton {
+  /**
+   * Every feature button ever built, in construction order — the command
+   * palette's source for the part workbench, the way `SketchToolbar`'s own
+   * list is its source for the sketcher. A registry rather than sixteen
+   * services each publishing their button: they all already funnel through
+   * this constructor, and the class exposes everything a palette row needs
+   * (label, icon, reachability, and a {@link click} that runs the service's
+   * coordination unchanged).
+   *
+   * Buttons live as long as the app does, so nothing is ever removed.
+   */
+  private static readonly registry: FeatureButton[] = [];
+
   onClick?: () => void;
   /** Fired whenever `visible`, `disabled`, or `active` changes. */
   onStateChange?: () => void;
@@ -64,6 +77,30 @@ export class FeatureButton {
     } else {
       group.appendChild(this.wrap);
     }
+    FeatureButton.registry.push(this);
+  }
+
+  /**
+   * The feature buttons a user could press right now: shown, enabled, and in
+   * a navbar group the current workbench actually displays (the navbar hides
+   * a group by putting `hidden` on its host, so an ancestor carrying it means
+   * this button is off-bench). Create buttons hidden while a sketch is being
+   * edited ({@link setSketchHidden}) are off the list too: Finish Sketch owns
+   * that group until the sketch closes.
+   */
+  static reachable(): FeatureButton[] {
+    return FeatureButton.registry.filter(
+      (button) =>
+        button._visible &&
+        !button._disabled &&
+        !button.wrap.classList.contains('feature-sketch-hidden') &&
+        button.wrap.closest('.hidden') === null,
+    );
+  }
+
+  /** Drop every registered button. Tests only — the app never unbuilds one. */
+  static clearRegistry(): void {
+    FeatureButton.registry.length = 0;
   }
 
   /** The button's icon URL, for surfaces that mirror the button. */
