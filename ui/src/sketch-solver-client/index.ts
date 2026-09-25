@@ -30,6 +30,10 @@ export type { LiveEntityGeometry } from './live-system';
 export { solvedHitTest, datumHitTest, refFor } from './hit-test';
 export type { SolvedHit, SolvedVertexHit, SolvedEdgeHit, SolvedDatumHit, SketchDatumName } from './hit-test';
 export { tessellateSolvedEntity, arcSweep } from './tessellate';
+export {
+  bezierControlBindings, bezierPayloadPoints, liveBezierControlPoints, tessellateBezier,
+} from './bezier-preview';
+export type { BezierControlBinding } from './bezier-preview';
 export { buildPositionWriteBack } from './write-back';
 export { updateDragTargets } from './drag-targets';
 export type { SolvedDragMode, SolvedDragTarget } from './drag-targets';

@@ -802,6 +802,9 @@ export class SketchToolbarService {
       (x, y) => this.activeHoverSelectHandler?.hasBadgeAt(x, y) ?? false,
       (message) => this.showOpMessage(message),
     );
+    this.activeSolvedDragHandler.onPreview = (sketchMesh) => {
+      this.bezierHandles.refreshLive(sketchMesh.liveBezierPoles());
+    };
     this.activeSolvedDragHandler.updateSceneData(this.viewer.currentSceneObjects, this.activeSketchInfo.sketchObj.id!);
     this.activeSolvedDragHandler.activate();
 

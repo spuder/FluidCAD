@@ -18,6 +18,9 @@ export class BezierHandlesOverlay {
   private ctx: SceneContext;
   private group: Group;
   private active = false;
+  private plane: PlaneData | null = null;
+  /** The last payload's handle polygons, per bezier statement. */
+  private curves: { id: string | null; points: [number, number][] }[] = [];
 
   constructor(ctx: SceneContext) {
     this.ctx = ctx;
@@ -40,6 +43,7 @@ export class BezierHandlesOverlay {
     }
     this.ctx.scene.remove(this.group);
     this.disposeGroup();
+    this.curves = [];
     this.active = false;
     this.ctx.requestRender();
   }
@@ -48,10 +52,8 @@ export class BezierHandlesOverlay {
     if (!this.active) {
       return;
     }
-    this.disposeGroup();
-
-    const camera = this.ctx.camera;
-    const planeNormal = new Vector3(plane.normal.x, plane.normal.y, plane.normal.z);
+    this.plane = plane;
+    this.curves = [];
 
     for (const obj of sceneObjects) {
       if (obj.parentId !== sketchId || (obj as any).type !== 'bezier') {
@@ -78,6 +80,37 @@ export class BezierHandlesOverlay {
       if (poles) {
         allPoints.push(...poles);
       }
+      this.curves.push({ id: obj.id ?? null, points: allPoints });
+    }
+
+    this.draw(null);
+  }
+
+  /**
+   * Live drag frame: redraw the handles at the control points' current
+   * solver positions (`liveBezierPoles` of the sketch mesh), so a dragged
+   * control point and its dashed legs follow the cursor. Curves missing
+   * from the map keep their payload positions.
+   */
+  refreshLive(livePoles: Map<string, [number, number][]>): void {
+    if (!this.active) {
+      return;
+    }
+    this.draw(livePoles);
+  }
+
+  private draw(livePoles: Map<string, [number, number][]> | null): void {
+    this.disposeGroup();
+    const plane = this.plane;
+    if (!plane) {
+      return;
+    }
+    const camera = this.ctx.camera;
+    const planeNormal = new Vector3(plane.normal.x, plane.normal.y, plane.normal.z);
+
+    for (const curve of this.curves) {
+      const live = curve.id ? livePoles?.get(curve.id) : undefined;
+      const allPoints = live && live.length === curve.points.length ? live : curve.points;
       for (let i = 1; i < allPoints.length; i++) {
         addDashedLine(this.group, allPoints[i - 1], allPoints[i], plane, META_VERTEX_RENDER_ORDER);
       }

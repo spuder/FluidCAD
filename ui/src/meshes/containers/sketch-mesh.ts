@@ -24,10 +24,14 @@ import { addFrameHook } from '../frame-hooks';
 import {
   SolvedSketchModel,
   buildSolvedSketchModel,
+  bezierControlBindings,
   layoutConstraintGlyphs,
+  liveBezierControlPoints,
+  tessellateBezier,
   tessellateSolvedEntity,
 } from '../../sketch-solver-client';
-import type { LiveEntityGeometry } from '../../sketch-solver-client';
+import type { BezierControlBinding, LiveEntityGeometry } from '../../sketch-solver-client';
+import type { Vec2 } from '../../sketch-solver-client/resolve';
 import { localToWorld } from '../../interactive/sketch-plane-utils';
 import { themeColors } from '../../scene/theme-colors';
 import { viewerSettings } from '../../scene/viewer-settings';
@@ -59,6 +63,12 @@ export class SketchMesh extends Group {
   /** Solved entity id → its edge meshes — EdgeMesh for regular entities,
    * MetaEdgeMesh (dash-dot) for guides — for live drag updates (P4). */
   private solvedEdgeMeshes = new Map<number, Group[]>();
+  /** Bezier curves' edge meshes with their control-point bindings — the
+   * curve is no entity, so live drags redraw it from its control points. */
+  private bezierEdgeMeshes: { meshes: Group[]; bindings: BezierControlBinding[] }[] = [];
+  /** Bezier statement id → its control-point bindings (for the handle
+   * overlay's live control polygon). */
+  private bezierBindings = new Map<string, BezierControlBinding[]>();
   /** Vertex-dot groups bound to solved entity points, for live drag moves. */
   private solvedDotBindings: { group: Group; entityId: number; role: 'point' | 'start' | 'end' | 'center' }[] = [];
   /** The current glyph groups — replaced wholesale on live updates. */
@@ -141,64 +151,16 @@ export class SketchMesh extends Group {
         continue;
       }
       for (const edgeMesh of meshes) {
-        for (const child of edgeMesh.children) {
-          if (child.userData.isEdgeLine) {
-            const line = child as LineSegments2;
-            const geometry = line.geometry as LineSegmentsGeometry;
-            // setPositions must keep the segment count the mesh was built
-            // with — the renderer caches the instance count per geometry, so
-            // a different count clips or overruns the draw.
-            const segments = geometry.attributes.instanceStart?.count;
-            if (!segments) {
-              continue;
-            }
-            const points = tessellateSolvedEntity(view, segments);
-            if (!points || points.length !== segments + 1) {
-              continue;
-            }
-            const positions = new Float32Array(segments * 6);
-            let offset = 0;
-            let prev = localToWorld(points[0], model.plane);
-            for (let i = 1; i < points.length; i++) {
-              const next = localToWorld(points[i], model.plane);
-              positions[offset++] = prev.x;
-              positions[offset++] = prev.y;
-              positions[offset++] = prev.z;
-              positions[offset++] = next.x;
-              positions[offset++] = next.y;
-              positions[offset++] = next.z;
-              prev = next;
-            }
-            geometry.setPositions(positions);
-            geometry.computeBoundingBox();
-            geometry.computeBoundingSphere();
-          } else if (child.userData.isDashDotEdgeLine) {
-            // Guide entities render as a continuous dash-dot polyline —
-            // rewrite its points in place, keeping the vertex count the
-            // geometry was built with.
-            const line = child as Line;
-            const geometry = line.geometry as BufferGeometry;
-            const posAttr = geometry.getAttribute('position') as BufferAttribute | undefined;
-            const pointCount = posAttr?.count ?? 0;
-            if (!posAttr || pointCount < 2) {
-              continue;
-            }
-            const points = tessellateSolvedEntity(view, pointCount - 1);
-            if (!points || points.length !== pointCount) {
-              continue;
-            }
-            for (let i = 0; i < points.length; i++) {
-              const world = localToWorld(points[i], model.plane);
-              posAttr.setXYZ(i, world.x, world.y, world.z);
-            }
-            posAttr.needsUpdate = true;
-            // The dash pattern accumulates distance along the polyline —
-            // stale distances would stretch the dashes as the curve moves.
-            line.computeLineDistances();
-            geometry.computeBoundingBox();
-            geometry.computeBoundingSphere();
-          }
-        }
+        this.rewriteEdgeMesh(edgeMesh, segments => tessellateSolvedEntity(view, segments), model.plane);
+      }
+    }
+
+    // Beziers are not entities: redraw each from its control points' live
+    // positions (anchor points, or the entity points they are pinned to).
+    for (const curve of this.bezierEdgeMeshes) {
+      const poles = liveBezierControlPoints(curve.bindings, model);
+      for (const edgeMesh of curve.meshes) {
+        this.rewriteEdgeMesh(edgeMesh, segments => tessellateBezier(poles, segments), model.plane);
       }
     }
 
@@ -219,6 +181,83 @@ export class SketchMesh extends Group {
     }
 
     this.rebuildSolvedGlyphs();
+  }
+
+  /** Every bezier's control points at their current (live) positions,
+   * keyed by statement id — the handle overlay redraws from these mid-drag. */
+  liveBezierPoles(): Map<string, Vec2[]> {
+    const out = new Map<string, Vec2[]>();
+    for (const [id, bindings] of this.bezierBindings) {
+      out.set(id, liveBezierControlPoints(bindings, this.solvedModel));
+    }
+    return out;
+  }
+
+  /** Rewrite an edge mesh's polyline in place from `tessellate`, keeping
+   * the segment count the mesh was built with. */
+  private rewriteEdgeMesh(
+    edgeMesh: Group,
+    tessellate: (segments: number) => Vec2[] | null,
+    plane: SolvedSketchModel['plane'],
+  ): void {
+    for (const child of edgeMesh.children) {
+      if (child.userData.isEdgeLine) {
+        const line = child as LineSegments2;
+        const geometry = line.geometry as LineSegmentsGeometry;
+        // setPositions must keep the segment count the mesh was built
+        // with — the renderer caches the instance count per geometry, so
+        // a different count clips or overruns the draw.
+        const segments = geometry.attributes.instanceStart?.count;
+        if (!segments) {
+          continue;
+        }
+        const points = tessellate(segments);
+        if (!points || points.length !== segments + 1) {
+          continue;
+        }
+        const positions = new Float32Array(segments * 6);
+        let offset = 0;
+        let prev = localToWorld(points[0], plane);
+        for (let i = 1; i < points.length; i++) {
+          const next = localToWorld(points[i], plane);
+          positions[offset++] = prev.x;
+          positions[offset++] = prev.y;
+          positions[offset++] = prev.z;
+          positions[offset++] = next.x;
+          positions[offset++] = next.y;
+          positions[offset++] = next.z;
+          prev = next;
+        }
+        geometry.setPositions(positions);
+        geometry.computeBoundingBox();
+        geometry.computeBoundingSphere();
+      } else if (child.userData.isDashDotEdgeLine) {
+        // Guide entities render as a continuous dash-dot polyline —
+        // rewrite its points in place, keeping the vertex count the
+        // geometry was built with.
+        const line = child as Line;
+        const geometry = line.geometry as BufferGeometry;
+        const posAttr = geometry.getAttribute('position') as BufferAttribute | undefined;
+        const pointCount = posAttr?.count ?? 0;
+        if (!posAttr || pointCount < 2) {
+          continue;
+        }
+        const points = tessellate(pointCount - 1);
+        if (!points || points.length !== pointCount) {
+          continue;
+        }
+        for (let i = 0; i < points.length; i++) {
+          const world = localToWorld(points[i], plane);
+          posAttr.setXYZ(i, world.x, world.y, world.z);
+        }
+        posAttr.needsUpdate = true;
+        // The dash pattern accumulates distance along the polyline —
+        // stale distances would stretch the dashes as the curve moves.
+        line.computeLineDistances();
+        geometry.computeBoundingBox();
+        geometry.computeBoundingSphere();
+      }
+    }
   }
 
   /** Bind each vertex dot to the solved entity point it sits on, by world
@@ -344,6 +383,11 @@ export class SketchMesh extends Group {
       }
 
       const edgeColor = this.edgeColorFor(obj);
+      const bezierBindings = bezierControlBindings(obj, this.solvedModel);
+      const bezierMeshes: Group[] = [];
+      if (bezierBindings && obj.id) {
+        this.bezierBindings.set(obj.id, bezierBindings);
+      }
 
       for (const shape of obj.sceneShapes) {
         if (shape.isMetaShape || shape.isGuide) {
@@ -367,6 +411,8 @@ export class SketchMesh extends Group {
                 const list = this.solvedEdgeMeshes.get(entityId) ?? [];
                 list.push(metaMesh);
                 this.solvedEdgeMeshes.set(entityId, list);
+              } else if (bezierBindings) {
+                bezierMeshes.push(metaMesh);
               }
             }
             this.add(metaMesh);
@@ -387,8 +433,13 @@ export class SketchMesh extends Group {
           const list = this.solvedEdgeMeshes.get(entityId) ?? [];
           list.push(edgeMesh);
           this.solvedEdgeMeshes.set(entityId, list);
+        } else if (bezierBindings) {
+          bezierMeshes.push(edgeMesh);
         }
         this.add(edgeMesh);
+      }
+      if (bezierBindings && bezierMeshes.length > 0) {
+        this.bezierEdgeMeshes.push({ meshes: bezierMeshes, bindings: bezierBindings });
       }
     }
   }

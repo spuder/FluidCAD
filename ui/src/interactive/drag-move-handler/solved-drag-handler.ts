@@ -64,6 +64,9 @@ export class SolvedDragHandler {
   /** True while the write-back round-trip is in flight — a re-render landing
    * meanwhile must win over our stale preview reset. */
   private committing = false;
+  /** Fired after every live preview rewrite of the sketch mesh (drag frame
+   * or reset) — overlays drawn outside the mesh (bezier handles) follow. */
+  onPreview: ((sketchMesh: SketchMesh) => void) | null = null;
 
   private boundCanvasPointerDown: (e: PointerEvent) => void;
   private boundPointerMove: (e: PointerEvent) => void;
@@ -243,6 +246,7 @@ export class SolvedDragHandler {
 
     this.lastDragOutcome = this.live.dragSolve(this.targets.map(t => t.point));
     this.sketchMesh?.updateSolvedGeometry(id => this.live!.entityGeometry(id));
+    this.notifyPreview();
     this.ctx.requestRender();
   }
 
@@ -311,7 +315,14 @@ export class SolvedDragHandler {
     }
     live.reset(model.solver);
     this.sketchMesh?.updateSolvedGeometry(id => live.entityGeometry(id));
+    this.notifyPreview();
     this.ctx.requestRender();
+  }
+
+  private notifyPreview(): void {
+    if (this.sketchMesh) {
+      this.onPreview?.(this.sketchMesh);
+    }
   }
 
   private endDrag(): void {
