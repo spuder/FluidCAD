@@ -65,6 +65,7 @@ const MAX_RESULTS = 50;
  */
 export class CommandPalette {
   private popover: HTMLDivElement | null = null;
+  private list: HTMLElement | null = null;
   private commands: PaletteCommand[] = [];
   private query = '';
   private highlighted = 0;
@@ -79,7 +80,9 @@ export class CommandPalette {
   close(): void {
     this.popover?.remove();
     this.popover = null;
+    this.list = null;
     document.removeEventListener('pointerdown', this.onDocumentPointerDown, true);
+    document.removeEventListener('keydown', this.onDocumentKeyDown, true);
   }
 
   toggle(): void {
@@ -117,17 +120,18 @@ export class CommandPalette {
 
     document.body.appendChild(popover);
     this.popover = popover;
+    this.list = list;
     this.commands = this.getCommands();
     this.query = '';
     this.highlighted = 0;
     document.addEventListener('pointerdown', this.onDocumentPointerDown, true);
+    document.addEventListener('keydown', this.onDocumentKeyDown, true);
 
     input.addEventListener('input', () => {
       this.query = input.value;
       this.highlighted = 0;
       this.renderResults(list);
     });
-    input.addEventListener('keydown', (event) => this.onKeyDown(event, list));
     input.focus();
 
     this.renderResults(list);
@@ -139,7 +143,22 @@ export class CommandPalette {
     }
   };
 
-  private onKeyDown(event: KeyboardEvent, list: HTMLElement): void {
+  /**
+   * Capture phase on the document, like the app's other overlays (settings,
+   * share, the confirm dialog), and every key handled here stops propagating.
+   * A key the palette acts on is spent: the modify-pick panel applies its
+   * feature on any document-level Enter, and it and the sketch toolbar both
+   * back out on any Escape — so an Enter that picked "Fillet" would otherwise
+   * apply the fillet it just opened, and an Escape that dismissed the palette
+   * would also close whatever dialog or tool sat behind it. Listening on the
+   * document rather than the input also keeps the keys working once focus
+   * has moved onto a result row.
+   */
+  private readonly onDocumentKeyDown = (event: KeyboardEvent): void => {
+    const list = this.list;
+    if (!list) {
+      return;
+    }
     // The opening combo, handled here rather than by the ShortcutManager that
     // registered it: that manager stands down inside an `<input>`
     // (`isEditableTarget`), so while the palette holds focus the key would
@@ -147,16 +166,19 @@ export class CommandPalette {
     // take it for the address bar, or the VSCode host to open a Ctrl+K chord.
     if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault();
+      event.stopPropagation();
       this.close();
       return;
     }
     if (event.key === 'Escape') {
       event.preventDefault();
+      event.stopPropagation();
       this.close();
       return;
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
+      event.stopPropagation();
       if (this.results.length > 0) {
         const step = event.key === 'ArrowDown' ? 1 : -1;
         this.highlighted = (this.highlighted + step + this.results.length) % this.results.length;
@@ -164,11 +186,13 @@ export class CommandPalette {
       }
       return;
     }
-    if (event.key === 'Enter') {
+    // An IME's Enter commits the composition; it is not a pick.
+    if (event.key === 'Enter' && !event.isComposing) {
       event.preventDefault();
+      event.stopPropagation();
       this.activate(this.highlighted);
     }
-  }
+  };
 
   private activate(index: number): void {
     const command = this.results[index];

@@ -124,6 +124,53 @@ describe('CommandPalette', () => {
     expect(event.defaultPrevented).toBe(false);
   });
 
+  // The modify-pick panel applies on any document-level Enter and it and the
+  // sketch toolbar back out on any Escape: a key the palette spent must not
+  // reach them too.
+  it('keeps the Enter that picks a command away from the rest of the app', () => {
+    const seen: string[] = [];
+    const onDocument = (e: KeyboardEvent) => seen.push(`document:${e.key}`);
+    const onWindow = (e: KeyboardEvent) => seen.push(`window:${e.key}`);
+    document.addEventListener('keydown', onDocument);
+    window.addEventListener('keydown', onWindow);
+    try {
+      make([cmd('fillet', 'Fillet')]).open();
+      press(input(), 'Enter');
+    } finally {
+      document.removeEventListener('keydown', onDocument);
+      window.removeEventListener('keydown', onWindow);
+    }
+
+    expect(runs).toEqual(['fillet']);
+    expect(seen).toEqual([]);
+  });
+
+  it('keeps the Escape that dismisses it away from the rest of the app', () => {
+    const seen: string[] = [];
+    const onWindow = (e: KeyboardEvent) => seen.push(e.key);
+    window.addEventListener('keydown', onWindow);
+    try {
+      const palette = make([cmd('line', 'Line')]);
+      palette.open();
+      press(input(), 'Escape');
+      expect(palette.isOpen()).toBe(false);
+    } finally {
+      window.removeEventListener('keydown', onWindow);
+    }
+
+    expect(seen).toEqual([]);
+  });
+
+  it('still navigates once focus has moved onto a result row', () => {
+    make([cmd('line', 'Line'), cmd('circle', 'Circle')]).open();
+    rows()[0].focus();
+
+    press(rows()[0], 'ArrowDown');
+    press(document.activeElement ?? document.body, 'Enter');
+
+    expect(runs).toEqual(['circle']);
+  });
+
   it('shows a shortcut badge for commands that carry one', () => {
     make([cmd('line', 'Line', { shortcut: 'l' }), cmd('undo', 'Undo', { shortcut: 'mod+z' })]).open();
 
