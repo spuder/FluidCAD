@@ -153,14 +153,24 @@ export class QuickOpen {
     }
   };
 
+  /**
+   * Every key handled here also stops propagating. A key the popover acts on
+   * is spent: the modify-pick panel applies its feature on any document-level
+   * Enter, and it and the sketch toolbar both back out on any Escape — so an
+   * Enter that opened a file would also apply an open Fillet, and an Escape
+   * that dismissed the popover would also close the dialog or disarm the tool
+   * behind it.
+   */
   private onKeyDown(event: KeyboardEvent, list: HTMLElement): void {
     if (event.key === 'Escape') {
       event.preventDefault();
+      event.stopPropagation();
       this.close();
       return;
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
+      event.stopPropagation();
       const total = this.results.length + (this.createTarget() ? 1 : 0);
       if (total > 0) {
         const step = event.key === 'ArrowDown' ? 1 : -1;
@@ -171,6 +181,7 @@ export class QuickOpen {
     }
     if (event.key === 'Enter') {
       event.preventDefault();
+      event.stopPropagation();
       this.activate(this.highlighted, list);
     }
   }
