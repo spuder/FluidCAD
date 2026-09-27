@@ -659,7 +659,9 @@ export type UIEditorCapabilitiesMessage = {
  * conflict when it does — without this, an agent writing through MCP or a
  * `git checkout` would be silently overwritten by the next save.
  *
- * Never emitted for the page's own writes through `/api/files/write`.
+ * Sent to every page for every change, the page's own writes included: a
+ * page recognises its own echo by mtime, and another page (a second tab or
+ * device on the same workspace) needs to hear about it.
  */
 export type UIFileEventMessage = {
   type: 'file-added' | 'file-changed' | 'file-removed';

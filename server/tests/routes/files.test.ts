@@ -172,6 +172,34 @@ describe('workspace file routes', () => {
       expect(write.body.mtimeMs).toBeGreaterThanOrEqual(read.body.mtimeMs);
     });
 
+    it('refuses a write whose expected mtime the disk has moved past', async () => {
+      const file = path.join(workspace, 'shared.part.js');
+      fs.writeFileSync(file, '// v1');
+      const read = await get('/files/read?path=shared.part.js');
+
+      // Another tab or device saves in between.
+      fs.writeFileSync(file, '// v2 from elsewhere');
+      fs.utimesSync(file, new Date(), new Date(Date.now() + 5_000));
+
+      const stale = await post('/files/write', { path: 'shared.part.js', content: '// mine', expectedMtimeMs: read.body.mtimeMs });
+      expect(stale.status).toBe(409);
+      expect(stale.body.conflict).toBe(true);
+      expect(fs.readFileSync(file, 'utf8')).toBe('// v2 from elsewhere');
+      expect(written).toEqual([]);
+
+      // Current mtime: accepted. No expectation at all: forced.
+      const fresh = await post('/files/write', { path: 'shared.part.js', content: '// mine', expectedMtimeMs: stale.body.mtimeMs });
+      expect(fresh.status).toBe(200);
+      const forced = await post('/files/write', { path: 'shared.part.js', content: '// forced' });
+      expect(forced.status).toBe(200);
+      expect(fs.readFileSync(file, 'utf8')).toBe('// forced');
+    });
+
+    it('writes a file that no longer exists whatever mtime was expected', async () => {
+      const { status } = await post('/files/write', { path: 'gone.part.js', content: '// back', expectedMtimeMs: 12345 });
+      expect(status).toBe(200);
+    });
+
     it('accepts an absolute path inside the workspace', async () => {
       fs.writeFileSync(path.join(workspace, 'abs.fluid.js'), 'ok');
       const abs = path.join(workspace, 'abs.fluid.js');
