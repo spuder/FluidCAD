@@ -403,6 +403,47 @@ function readJsonBody(req) {
   });
 }
 
+/**
+ * True for a request the hub's own page could have sent: JSON, same origin.
+ *
+ * The Host check (host-guard) stops DNS rebinding, not cross-site requests:
+ * a page on any site can make the browser POST to the hub, Host and all. What
+ * it cannot do without a CORS preflight the hub never grants is send
+ * `Content-Type: application/json`, and the browser labels where the request
+ * came from (`Sec-Fetch-Site`, `Origin`). Both are required here, so
+ * `text/plain` bodies and other sites' pages are refused. Clients that send
+ * neither header (curl, scripts) are not browsers being tricked, and pass.
+ */
+export function isSameOriginJson(req) {
+  const type = String(req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
+  if (type !== 'application/json') {
+    return false;
+  }
+  const site = req.headers['sec-fetch-site'];
+  if (site && site !== 'same-origin' && site !== 'none') {
+    return false;
+  }
+  const origin = req.headers.origin;
+  if (origin && origin !== 'null') {
+    let originHost;
+    try {
+      originHost = new URL(origin).host.toLowerCase();
+    } catch {
+      return false;
+    }
+    // Compared against the Host the browser addressed: behind a proxy that
+    // rewrites Host, the one it forwards in X-Forwarded-Host.
+    const hosts = [req.headers.host, req.headers['x-forwarded-host']]
+      .filter((value) => typeof value === 'string')
+      .flatMap((value) => value.split(','))
+      .map((value) => value.trim().toLowerCase());
+    if (!hosts.includes(originHost)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** `/p/<name>/rest?query` -> { name, rest } (rest keeps its leading slash), or null. */
 function parseProjectPath(url) {
   const match = /^\/p\/([^/?]+)(\/[^?]*)?(\?.*)?$/.exec(url);
@@ -448,6 +489,10 @@ async function runHub(opts) {
       return;
     }
     if (req.method === 'POST' && ['/hub/api/new', '/hub/api/stop', '/hub/api/delete', '/hub/api/rename'].includes(path)) {
+      if (!isSameOriginJson(req)) {
+        sendJson(res, 403, { error: 'Rejected: send JSON from the hub page itself.' });
+        return;
+      }
       let body;
       try {
         body = await readJsonBody(req);
