@@ -1,6 +1,7 @@
+import { spawn } from 'child_process';
 import { createServer, request as httpRequest } from 'http';
 import { connect } from 'net';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { findFreePort } from '../lib/server-client.js';
@@ -25,6 +26,7 @@ import { readProjectConfig } from '../../server/dist/project-config.js';
  */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const cliEntry = resolve(__dirname, '..', 'fluidcad.js');
 const startPage = resolve(__dirname, '..', '..', 'shell', 'static', 'start.html');
 const uiDist = resolve(__dirname, '..', '..', 'ui', 'dist');
 
@@ -70,6 +72,60 @@ function listProjects(root, engines, opened) {
   }
   projects.sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt));
   return projects;
+}
+
+/**
+ * Deleting moves the folder to `<projects>/.trash/<name>-<time>` rather than
+ * erasing it: a click in a browser should not be able to lose work for good.
+ * The dot keeps the trash out of the project list.
+ */
+function trashProject(root, name) {
+  const dir = join(root, name);
+  if (!existsSync(join(dir, 'init.js'))) {
+    throw new Error(`No project named "${name}".`);
+  }
+  const trash = join(root, '.trash');
+  mkdirSync(trash, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const target = join(trash, `${name}-${stamp}`);
+  renameSync(dir, target);
+  return target;
+}
+
+function renameProject(root, name, newName) {
+  const from = join(root, name);
+  const to = join(root, newName);
+  if (!existsSync(join(from, 'init.js'))) {
+    throw new Error(`No project named "${name}".`);
+  }
+  if (existsSync(to)) {
+    throw new Error(`"${newName}" already exists.`);
+  }
+  // Safe to move as a whole: files import each other relatively, and the
+  // saved editor state (.fluidcad/editor-state.json) is workspace-relative.
+  renameSync(from, to);
+}
+
+function createProject(root, name) {
+  const dir = join(root, name);
+  if (existsSync(join(dir, 'init.js'))) {
+    return Promise.reject(new Error(`A project named "${name}" already exists.`));
+  }
+  mkdirSync(dir, { recursive: true });
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(process.execPath, [cliEntry, 'init'], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    child.stdout.on('data', (data) => { output += data; });
+    child.stderr.on('data', (data) => { output += data; });
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      if (code === 0) {
+        resolvePromise();
+      } else {
+        reject(new Error(output.trim() || `fluidcad init exited with code ${code}.`));
+      }
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -261,9 +317,25 @@ const SHELL_SHIM = `<script>
         go(name.trim());
       },
       async newProject() {
-        alert('Create a project by running "fluidcad init" in a new subfolder of the projects folder, then reload this page.');
+        const name = prompt('New project name (letters, numbers, spaces, . _ -):');
+        if (!name) { return; }
+        try {
+          await post('hub/api/new', { name: name.trim() });
+          go(name.trim());
+        } catch (err) { fail(err); }
       },
       forgetLabel: 'Stop engine',
+      async renameProject(path) {
+        const name = byPath.get(path) ?? path;
+        const newName = prompt('Rename project "' + name + '" to:', name);
+        if (!newName || newName.trim() === name) { return; }
+        await post('hub/api/rename', { name, newName: newName.trim() }).catch(fail);
+      },
+      async deleteProject(path) {
+        const name = byPath.get(path) ?? path;
+        if (!confirm('Delete project "' + name + '"?\\n\\nIts folder is moved to .trash inside the projects folder.')) { return; }
+        await post('hub/api/delete', { name }).catch(fail);
+      },
       async forget(path) {
         // No recents list on the server: removing a card stops its engine.
         await post('hub/api/stop', { name: byPath.get(path) ?? path }).catch(fail);
@@ -420,7 +492,7 @@ async function runHub(opts) {
       sendJson(res, 200, { home: '', limit: projects.length, projects });
       return;
     }
-    if (req.method === 'POST' && path === '/hub/api/stop') {
+    if (req.method === 'POST' && ['/hub/api/new', '/hub/api/stop', '/hub/api/delete', '/hub/api/rename'].includes(path)) {
       if (!isSameOriginJson(req)) {
         sendJson(res, 403, { error: 'Rejected: send JSON from the hub page itself.' });
         return;
@@ -433,11 +505,50 @@ async function runHub(opts) {
         return;
       }
       if (!isValidName(body.name)) {
-        sendJson(res, 400, { error: 'Not a project name.' });
+        sendJson(res, 400, { error: 'Use letters, numbers, spaces, ".", "_" or "-" (up to 64), starting with a letter or number.' });
         return;
       }
-      await pool.stop(body.name);
-      sendJson(res, 200, { ok: true });
+      if (path === '/hub/api/rename') {
+        if (!isValidName(body.newName)) {
+          sendJson(res, 400, { error: 'Use letters, numbers, spaces, ".", "_" or "-" (up to 64), starting with a letter or number.' });
+          return;
+        }
+        await pool.stop(body.name);
+        try {
+          renameProject(root, body.name, body.newName);
+          if (opened.has(body.name)) {
+            opened.set(body.newName, opened.get(body.name));
+            opened.delete(body.name);
+          }
+          console.log(`Renamed project "${body.name}" to "${body.newName}".`);
+          sendJson(res, 200, { ok: true });
+        } catch (err) {
+          sendJson(res, 409, { error: err.message });
+        }
+        return;
+      }
+      if (path === '/hub/api/delete') {
+        await pool.stop(body.name);
+        try {
+          const target = trashProject(root, body.name);
+          console.log(`Moved project "${body.name}" to ${target}.`);
+          sendJson(res, 200, { ok: true });
+        } catch (err) {
+          sendJson(res, 404, { error: err.message });
+        }
+        return;
+      }
+      if (path === '/hub/api/stop') {
+        await pool.stop(body.name);
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+      try {
+        await createProject(root, body.name);
+        sendJson(res, 200, { ok: true });
+      } catch (err) {
+        sendJson(res, 409, { error: err.message });
+      }
       return;
     }
     sendJson(res, 404, { error: 'Not found.' });

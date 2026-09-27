@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { spawn, spawnSync, type ChildProcess } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import fs from 'fs';
 import net from 'net';
 import os from 'os';
@@ -8,7 +8,7 @@ import path from 'path';
 import WebSocket from 'ws';
 import { isSameOriginJson } from '../commands/hub.js';
 
-// The hub's POST routes act on projects (stopping engines), so they must only
+// The hub's project routes rename and delete folders, so they must only
 // answer the hub's own page: a page on another site can make the browser
 // POST to the hub (the Host header is the hub's own, so the loopback Host
 // check does not help), but it cannot send JSON or hide where it came from.
@@ -67,7 +67,7 @@ function freePort(): Promise<number> {
   });
 }
 
-describe('fluidcad hub: cross-site requests', () => {
+describe('fluidcad hub project routes', () => {
   let hub: ChildProcess;
   let base: string;
   let projects: string;
@@ -93,22 +93,35 @@ describe('fluidcad hub: cross-site requests', () => {
     fs.rmSync(projects, { recursive: true, force: true });
   });
 
-  const stop = (headers: Record<string, string>, body: unknown) =>
-    fetch(`${base}/hub/api/stop`, { method: 'POST', headers, body: JSON.stringify(body) });
+  const rename = (headers: Record<string, string>, body: unknown) =>
+    fetch(`${base}/hub/api/rename`, { method: 'POST', headers, body: JSON.stringify(body) });
 
-  it('refuses the cross-site request a hostile page can send', async () => {
-    const res = await stop({ 'Content-Type': 'text/plain', Origin: 'https://evil.example' }, { name: 'bracket' });
+  it('refuses the cross-site rename a hostile page can send', async () => {
+    const res = await rename(
+      { 'Content-Type': 'text/plain', Origin: 'https://evil.example' },
+      { name: 'bracket', newName: 'pwned' },
+    );
     expect(res.status).toBe(403);
+    expect(fs.existsSync(path.join(projects, 'bracket'))).toBe(true);
+    expect(fs.existsSync(path.join(projects, 'pwned'))).toBe(false);
   });
 
   it('refuses JSON from another origin', async () => {
-    const res = await stop({ 'Content-Type': 'application/json', Origin: 'https://evil.example' }, { name: 'bracket' });
+    const res = await rename(
+      { 'Content-Type': 'application/json', Origin: 'https://evil.example' },
+      { name: 'bracket', newName: 'pwned' },
+    );
     expect(res.status).toBe(403);
+    expect(fs.existsSync(path.join(projects, 'bracket'))).toBe(true);
   });
 
-  it('still answers the hub page itself', async () => {
-    const res = await stop({ 'Content-Type': 'application/json', Origin: base }, { name: 'bracket' });
+  it('still renames for the hub page itself', async () => {
+    const res = await rename(
+      { 'Content-Type': 'application/json', Origin: base },
+      { name: 'bracket', newName: 'renamed' },
+    );
     expect(res.status).toBe(200);
+    expect(fs.existsSync(path.join(projects, 'renamed', 'init.js'))).toBe(true);
   });
 });
 
@@ -190,6 +203,7 @@ describe('fluidcad hub — projects over HTTP', () => {
     const state = await res.json() as { projects: { name: string }[] };
     return state.projects.map((project) => project.name).sort();
   };
+  const entries = () => fs.readdirSync(projects).sort();
 
   it('lists only valid-named subfolders that hold an init.js', async () => {
     expect(await names()).toEqual(['good', 'my part']);
@@ -207,14 +221,87 @@ describe('fluidcad hub — projects over HTTP', () => {
     expect(await res.text()).toContain('window.fluidcadShell');
   });
 
-  it('refuses a bad project name or JSON body on stop (400)', async () => {
-    expect((await post('stop', { name: '../good' })).status).toBe(400);
-    expect((await post('stop', {})).status).toBe(400);
-    const res = await fetch(`${hub.base}/hub/api/stop`, {
+  it.each([
+    ['a parent-directory path', '../x'],
+    ['a nested path', 'a/b'],
+    ['an empty name', ''],
+    ['a leading dot', '.sneaky'],
+    ['a leading space', ' spaced'],
+    ['two dots inside', 'a..b'],
+    ['a name longer than 64', 'x'.repeat(65)],
+    ['a non-string', 42],
+  ])('refuses to create a project named with %s (400)', async (_label, name) => {
+    const before = entries();
+    const res = await post('new', { name });
+    expect(res.status).toBe(400);
+    expect(typeof (await res.json()).error).toBe('string');
+    expect(entries()).toEqual(before);
+  });
+
+  it('refuses a missing name and a bad JSON body (400)', async () => {
+    expect((await post('new', {})).status).toBe(400);
+    const res = await fetch(`${hub.base}/hub/api/new`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{not json',
     });
     expect(res.status).toBe(400);
   });
+
+  it.each(['../escaped', '', '.dot', 'a/b', 'a..b'])('refuses to rename to %j (400)', async (newName) => {
+    const before = entries();
+    const res = await post('rename', { name: 'good', newName });
+    expect(res.status).toBe(400);
+    expect(entries()).toEqual(before);
+    expect(fs.existsSync(path.join(projects, 'good', 'init.js'))).toBe(true);
+  });
+
+  it('refuses to rename or delete from an invalid source name (400)', async () => {
+    expect((await post('rename', { name: '../good', newName: 'x' })).status).toBe(400);
+    expect((await post('delete', { name: '.trash' })).status).toBe(400);
+    expect((await post('delete', { name: '../' + path.basename(projects) })).status).toBe(400);
+    expect(fs.existsSync(projects)).toBe(true);
+  });
+
+  it('creates, renames, and trashes a project', async () => {
+    // `new` runs `fluidcad init` in the new folder.
+    const created = await post('new', { name: 'fresh' });
+    expect(created.status).toBe(200);
+    expect(fs.existsSync(path.join(projects, 'fresh', 'init.js'))).toBe(true);
+    expect(await names()).toEqual(['fresh', 'good', 'my part']);
+
+    // Creating it again is a clash.
+    expect((await post('new', { name: 'fresh' })).status).toBe(409);
+
+    // Renaming onto an existing project (or any existing entry) is a clash
+    // and leaves both alone.
+    const clash = await post('rename', { name: 'fresh', newName: 'good' });
+    expect(clash.status).toBe(409);
+    expect(fs.existsSync(path.join(projects, 'fresh', 'init.js'))).toBe(true);
+    expect(fs.existsSync(path.join(projects, 'good', 'init.js'))).toBe(true);
+    expect((await post('rename', { name: 'fresh', newName: 'no-init' })).status).toBe(409);
+
+    // Renaming something that isn't a project is refused.
+    expect((await post('rename', { name: 'ghost', newName: 'ghost2' })).status).toBe(409);
+    expect(fs.existsSync(path.join(projects, 'ghost2'))).toBe(false);
+
+    const renamed = await post('rename', { name: 'fresh', newName: 'Fresh 2' });
+    expect(renamed.status).toBe(200);
+    expect(fs.existsSync(path.join(projects, 'fresh'))).toBe(false);
+    expect(fs.existsSync(path.join(projects, 'Fresh 2', 'init.js'))).toBe(true);
+
+    // Delete moves the folder under .trash rather than erasing it.
+    const trashBefore = fs.readdirSync(path.join(projects, '.trash'));
+    const deleted = await post('delete', { name: 'Fresh 2' });
+    expect(deleted.status).toBe(200);
+    expect(fs.existsSync(path.join(projects, 'Fresh 2'))).toBe(false);
+    const trashed = fs.readdirSync(path.join(projects, '.trash')).filter((entry) => !trashBefore.includes(entry));
+    expect(trashed).toHaveLength(1);
+    expect(trashed[0].startsWith('Fresh 2-')).toBe(true);
+    expect(fs.existsSync(path.join(projects, '.trash', trashed[0], 'init.js'))).toBe(true);
+    expect(await names()).toEqual(['good', 'my part']);
+
+    // Deleting it again: nothing there.
+    expect((await post('delete', { name: 'Fresh 2' })).status).toBe(404);
+  }, 60_000);
 
   it('redirects /p/<name> to <name>/ (relative, query kept)', async () => {
     const plain = await fetch(`${hub.base}/p/good`, { redirect: 'manual' });
@@ -268,12 +355,13 @@ describe('fluidcad hub — proxying to a project engine', () => {
 
   beforeAll(async () => {
     projects = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fluidcad-hub-engine-')));
-    // A project is any subfolder that `fluidcad init` has scaffolded.
-    const dir = path.join(projects, NAME);
-    fs.mkdirSync(dir);
-    const cli = path.resolve(import.meta.dirname, '..', 'fluidcad.js');
-    expect(spawnSync(process.execPath, [cli, 'init'], { cwd: dir }).status).toBe(0);
     hub = await startHub(projects);
+    const res = await fetch(`${hub.base}/hub/api/new`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: NAME }),
+    });
+    expect(res.status).toBe(200);
   }, 60_000);
 
   afterAll(async () => {
