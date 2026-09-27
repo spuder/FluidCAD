@@ -1,10 +1,11 @@
-import { fork, spawn } from 'child_process';
+import { spawn } from 'child_process';
 import { createServer, request as httpRequest } from 'http';
 import { connect } from 'net';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { findFreePort } from '../lib/server-client.js';
+import { startEngine } from '../lib/engine.js';
 import { isLoopbackBindAddress, isLoopbackHostHeader } from '../../server/dist/host-guard.js';
 import { readProjectConfig } from '../../server/dist/project-config.js';
 
@@ -13,8 +14,8 @@ import { readProjectConfig } from '../../server/dist/project-config.js';
  *
  * The engine holds one workspace per process, so the hub doesn't try to make
  * one server hold several. It does what the desktop app does instead: one
- * `fluidcad serve` child per project, started on demand, and a small front
- * process in front of them. The front serves the desktop start screen at `/`
+ * engine child per project (forked the way `fluidcad serve` forks its one),
+ * started on demand, and a small front process in front of them. The front serves the desktop start screen at `/`
  * and reverse-proxies `/p/<name>/*` to that project's engine with the prefix
  * stripped — which works because the page uses relative URLs throughout.
  *
@@ -128,7 +129,7 @@ function createProject(root, name) {
 }
 
 // ---------------------------------------------------------------------------
-// Engines: one `fluidcad serve` child per project
+// Engines: one engine child per project (bin/lib/engine.js)
 // ---------------------------------------------------------------------------
 
 class EnginePool {
@@ -155,11 +156,12 @@ class EnginePool {
 
   start(name) {
     const dir = join(this.root, name);
-    const engine = { state: 'starting', child: null, port: 0, ready: null, lastActivity: Date.now(), sockets: 0 };
+    /** `close` stops the engine's file watcher; set once it is ready. */
+    const engine = { state: 'starting', child: null, port: 0, ready: null, close: null, lastActivity: Date.now(), sockets: 0 };
     this.engines.set(name, engine);
 
     engine.ready = (async () => {
-      const requested = await findFreePort(ENGINE_FIRST_PORT, 500);
+      const port = await findFreePort(ENGINE_FIRST_PORT, 500);
       if (engine.state === 'stopped') {
         throw new Error(`The engine for "${name}" was stopped before it started.`);
       }
@@ -167,11 +169,6 @@ class EnginePool {
       // only client.
       const env = { ...process.env };
       delete env.FLUIDCAD_SERVER_HOST;
-      const child = fork(cliEntry, ['serve', '--workspace', dir, '--port', String(requested), '--no-open'], {
-        env,
-        stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-      });
-      engine.child = child;
 
       const prefix = `[${name}] `;
       const log = (stream) => (data) => {
@@ -181,36 +178,30 @@ class EnginePool {
           }
         }
       };
-      child.stderr.on('data', log(process.stderr));
 
-      await new Promise((resolvePromise, reject) => {
-        let buffer = '';
-        const timeout = setTimeout(() => {
-          child.kill('SIGTERM');
-          reject(new Error(`The engine for "${name}" did not start within ${ENGINE_START_TIMEOUT_MS / 1000}s.`));
-        }, ENGINE_START_TIMEOUT_MS);
-        child.stdout.on('data', (data) => {
-          log(process.stdout)(data);
-          if (engine.state !== 'starting') {
-            return;
-          }
-          buffer += data;
-          const ready = buffer.match(/FluidCAD ready at https?:\/\/[^\s:]+:(\d+)/);
-          if (ready) {
-            engine.port = Number(ready[1]);
-          }
-          if (buffer.includes('FluidCAD initialized successfully.') && engine.port) {
-            clearTimeout(timeout);
-            engine.state = 'ready';
-            resolvePromise();
-          }
+      let started;
+      try {
+        started = await startEngine({
+          workspacePath: dir,
+          port,
+          env,
+          timeoutMs: ENGINE_START_TIMEOUT_MS,
+          onSpawn: (child) => { engine.child = child; },
+          onStdout: log(process.stdout),
+          onStderr: log(process.stderr),
         });
-        child.on('exit', (code) => {
-          clearTimeout(timeout);
-          // A no-op once ready; also settles waiters when stopped mid-start.
-          reject(new Error(`The engine for "${name}" exited with code ${code} before it was ready.`));
-        });
-      });
+      } catch (err) {
+        throw new Error(`The engine for "${name}" failed to start: ${err.message}`);
+      }
+      if (engine.state === 'stopped') {
+        // stop() ran after the handshake had already been sent; it has
+        // signalled the child, so only the watcher is left to release.
+        started.close();
+        throw new Error(`The engine for "${name}" was stopped before it started.`);
+      }
+      engine.port = started.port;
+      engine.close = started.close;
+      engine.state = 'ready';
     })();
 
     engine.ready.catch((err) => {
@@ -224,6 +215,7 @@ class EnginePool {
     engine.ready.then(() => {
       engine.child.on('exit', () => {
         engine.state = 'stopped';
+        engine.close?.();
         if (this.engines.get(name) === engine) {
           this.engines.delete(name);
         }
@@ -233,7 +225,10 @@ class EnginePool {
     return engine;
   }
 
-  /** Resolves once the engine has exited (or after `graceMs`), so its folder can be moved. */
+  /**
+   * Resolves once the engine has exited, so its folder can be moved: SIGTERM,
+   * then SIGKILL if it is still there after `graceMs`.
+   */
   stop(name, graceMs = 5_000) {
     const engine = this.engines.get(name);
     if (!engine) {
@@ -241,16 +236,25 @@ class EnginePool {
     }
     this.engines.delete(name);
     engine.state = 'stopped';
+    engine.close?.();
     const child = engine.child;
     if (!child || child.exitCode !== null || child.signalCode !== null) {
       return Promise.resolve();
     }
     return new Promise((resolvePromise) => {
-      const timer = setTimeout(resolvePromise, graceMs);
-      child.once('exit', () => {
-        clearTimeout(timer);
+      const timers = [];
+      const done = () => {
+        timers.forEach(clearTimeout);
         resolvePromise();
-      });
+      };
+      child.once('exit', done);
+      timers.push(setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill('SIGKILL');
+        }
+      }, graceMs));
+      // Backstop: never leave a request hanging on an exit event that is lost.
+      timers.push(setTimeout(done, graceMs + 2_000));
       child.kill('SIGTERM');
     });
   }
