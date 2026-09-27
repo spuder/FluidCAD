@@ -47,8 +47,6 @@ export type SaveConflictChoice = 'overwrite' | 'reload' | 'keep';
 export type SaveOptions = {
   /** Skip the conflict check and write over whatever is on disk. */
   force?: boolean;
-  /** The page is going away: let the request outlive it, and never ask. */
-  keepalive?: boolean;
 };
 
 /** A save the user chose not to complete; the buffer stays dirty. */
@@ -191,10 +189,9 @@ export class WorkspaceModels {
     try {
       written = await writeWorkspaceFile(entry.relPath, entry.model.getValue(), {
         expectedMtimeMs: options.force ? undefined : entry.mtimeMs,
-        keepalive: options.keepalive,
       });
     } catch (err) {
-      if (!isWriteConflict(err) || options.keepalive || !this.conflictResolver) {
+      if (!isWriteConflict(err) || !this.conflictResolver) {
         throw err;
       }
       const choice = await this.conflictResolver(entry.relPath);
@@ -229,14 +226,9 @@ export class WorkspaceModels {
 
   /**
    * Sequential, so conflict prompts come one at a time; stops at the first
-   * failure. A keepalive save (the page is going away) never prompts and
-   * can't wait, so those all go out at once.
+   * failure.
    */
   async saveAllDirty(options: SaveOptions = {}): Promise<void> {
-    if (options.keepalive) {
-      await Promise.allSettled(this.dirtyPaths().map((absPath) => this.save(absPath, options)));
-      return;
-    }
     for (const absPath of this.dirtyPaths()) {
       await this.save(absPath, options);
     }

@@ -324,10 +324,9 @@ FluidCAD logo returns to the picker, saving any unsaved files first.
 
 Several devices can have the same project open. A file saved on one reloads
 on the others; one with unsaved edits there gets a warning instead, and
-saving it asks whether to overwrite the newer version or load it. Unsaved
-edits are also saved when the page is hidden or closed, since mobile Safari
-gives no chance to ask. The 3D view is one scene per project, so switching
-files on one device switches it on the others.
+saving it asks whether to overwrite the newer version or load it. The 3D
+view is one scene per project, so switching files on one device switches it
+on the others.
 
 | Flag | Description | Default |
 |------|-------------|---------|
