@@ -3,6 +3,7 @@ import { PickSlot, PickSlotChip } from '../pick-slot';
 import { NewVariable, ValueExpr } from '../../api';
 import { ExpressionField, collectNewVariables } from '../../ui/expression-field';
 import { VariableInfo } from '../../ui/expression-core';
+import { iconUrl } from '../../icon-url';
 
 export type PlaneType = 'offset' | 'mid' | 'edge';
 
@@ -49,7 +50,7 @@ export class PlanePanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-plane-panel',
       title: 'Plane',
-      icon: '/icons/plane.png',
+      icon: iconUrl('plane'),
       bodyHtml: `
         <label class="flex flex-col gap-1.5">
           <span class="text-base-content/70">Type</span>

@@ -25,3 +25,9 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/**
+ * Base URL of the icon PNGs, set per build through Vite's `define` (see
+ * `icon-url.ts`). Undefined when source runs without a Vite build config.
+ */
+declare const __FLUIDCAD_ICON_BASE__: string | undefined;

@@ -1,5 +1,6 @@
 import { PanelShell } from './panel-controls';
 import { PickSlot } from '../pick-slot';
+import { iconUrl } from '../../icon-url';
 
 /** How the dialog opened — see {@link SketchStartPanel.setMode}. */
 export type SketchPanelMode = 'create' | 'adopted' | 'edit';
@@ -48,7 +49,7 @@ export class SketchStartPanel {
   private sectionViewInput: HTMLInputElement;
 
   constructor(container: HTMLElement) {
-    this.shell = new PanelShell(container, 'fluidcad-sketch-panel', 'Sketch', '/icons/sketch.png');
+    this.shell = new PanelShell(container, 'fluidcad-sketch-panel', 'Sketch', iconUrl('sketch'));
     this.shell.onEscape = () => this.onEscape?.();
     this.shell.body.insertAdjacentHTML('beforeend', `
       <div data-role="target-slot"></div>

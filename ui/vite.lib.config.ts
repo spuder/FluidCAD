@@ -11,6 +11,11 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   root: path.resolve(import.meta.dirname),
   plugins: [tailwindcss()],
+  define: {
+    // Absolute: library hosts may mount the viewer at deep paths, where a
+    // relative base would resolve wrongly (see src/icon-url.ts).
+    __FLUIDCAD_ICON_BASE__: JSON.stringify('/icons/'),
+  },
   build: {
     outDir: 'dist-lib',
     emptyOutDir: true,

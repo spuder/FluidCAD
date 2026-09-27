@@ -1,4 +1,5 @@
 import { ICON_IMG_FALLBACK } from '../../ui/object-icons';
+import { iconUrl } from '../../icon-url';
 
 export type ModifyFeatureKind = 'sketch' | 'fillet' | 'chamfer' | 'shell' | 'offset';
 
@@ -62,10 +63,10 @@ export const FEATURES: Record<ModifyFeatureKind, FeatureConfig> = {
 };
 
 /**
- * Same artwork the timeline shows for the feature (`/icons/<type>.png`). The
+ * Same artwork the timeline shows for the feature (`iconUrl(<type>)`). The
  * toolbar buttons render it at 32px (`w-8 h-8`); the dialog title keeps the
  * smaller default that sits proportionally beside its `text-sm` heading.
  */
 export function featureIconImg(kind: ModifyFeatureKind, sizeClass = 'w-4 h-4'): string {
-  return `<img src="/icons/${kind}.png" ${ICON_IMG_FALLBACK} class="${sizeClass} object-contain" alt="" />`;
+  return `<img src="${iconUrl(kind)}" ${ICON_IMG_FALLBACK} class="${sizeClass} object-contain" alt="" />`;
 }

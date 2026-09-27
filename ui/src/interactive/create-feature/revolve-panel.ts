@@ -9,6 +9,7 @@ import { RevolveOptionValues, ValueExpr } from '../../api';
 import { ExpressionField, collectNewVariables } from '../../ui/expression-field';
 import { VariableInfo } from '../../ui/expression-core';
 import { PickSlotChip } from '../pick-slot';
+import { iconUrl } from '../../icon-url';
 
 /** Validated form values, or the message to show when a field is invalid. */
 export type RevolveValues = RevolveOptionValues | { error: string };
@@ -51,7 +52,7 @@ export class RevolvePanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-revolve-panel',
       title: 'Revolve',
-      icon: '/icons/revolve.png',
+      icon: iconUrl('revolve'),
       bodyHtml: `
         <div data-role="tabs" class="join w-full"></div>
         <div data-role="profile-slot"></div>

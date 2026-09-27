@@ -638,7 +638,7 @@ async function updateInsertChain(
   },
 ): Promise<void> {
   try {
-    await fetch('/api/update-insert-chain', {
+    await fetch('api/update-insert-chain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sourceLocation, edit }),
@@ -2977,8 +2977,14 @@ function applySceneRendered(msg: any): void {
 }
 
 function connectWebSocket() {
-  // Protocol-relative: plain ws:// is blocked from an https page.
-  const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
+  // Protocol-relative: plain ws:// is blocked from an https page. Resolved
+  // against the page's own directory, so behind a path-prefix proxy
+  // (/p/<name>/) the socket goes through the same prefix; at / it is the
+  // bare host, as before.
+  const wsUrl = new URL('.', window.location.href);
+  wsUrl.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  wsUrl.search = '';
+  wsUrl.hash = '';
   const ws = new WebSocket(wsUrl);
 
   ws.addEventListener('open', () => {
