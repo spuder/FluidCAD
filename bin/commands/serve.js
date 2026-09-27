@@ -1,32 +1,7 @@
-import { fork } from 'child_process';
-import { existsSync } from 'fs';
-import { resolve, dirname, isAbsolute, join } from 'path';
-import { fileURLToPath } from 'url';
+import { resolve } from 'path';
 import open from 'open';
-import { createFileWatcher, findFluidFiles, isFluidScriptFile } from '../watcher.js';
 import { findFreePort } from '../lib/server-client.js';
-import { readWorkspaceEditorState } from '../../server/dist/routes/workspace-state.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const serverEntry = resolve(__dirname, '..', '..', 'server', 'dist', 'index.js');
-
-/**
- * The model to render first. A workspace that has been opened before names it
- * — reopening should land on what the user was last looking at, not on
- * whatever sorts first — and a fresh one falls back to the first model
- * (part or assembly) at the top level. The page restores the rest of the tab
- * strip itself.
- */
-function pickOpeningFile(workspacePath) {
-  const { activeTab } = readWorkspaceEditorState(workspacePath);
-  if (activeTab) {
-    const absPath = isAbsolute(activeTab) ? activeTab : join(workspacePath, activeTab);
-    if (existsSync(absPath) && isFluidScriptFile(absPath)) {
-      return absPath;
-    }
-  }
-  return findFluidFiles(workspacePath)[0] ?? null;
-}
+import { startEngine } from '../lib/engine.js';
 
 async function runServe(opts) {
   const workspacePath = resolve(opts.workspace);
@@ -41,63 +16,53 @@ async function runServe(opts) {
   if (freePort !== requestedPort) {
     console.log(`Port ${requestedPort} is in use — starting on ${freePort} instead.`);
   }
-  const port = String(freePort);
 
-  const server = fork(serverEntry, [], {
-    env: {
-      ...process.env,
-      FLUIDCAD_SERVER_PORT: port,
-      FLUIDCAD_WORKSPACE_PATH: workspacePath,
-    },
-    // Load-bearing: without it the engine's sourceLocations shift by the SSR
-    // transform's line offset, mis-targeting breakpoints and feature edits.
-    execArgv: ['--enable-source-maps'],
-    stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-  });
+  let engine = null;
+  const closeWatcher = () => { engine?.close(); };
 
-  server.stdout.on('data', (data) => { process.stdout.write(data); });
-  server.stderr.on('data', (data) => { process.stderr.write(data); });
-
-  let watcher;
-
-  server.on('message', (msg) => {
-    if (msg.type === 'ready') {
-      console.log(`FluidCAD ready at ${msg.url}`);
-      if (opts.open) {
-        open(msg.url).catch((err) => {
-          console.error(`Failed to open browser: ${err.message}`);
+  try {
+    engine = await startEngine({
+      workspacePath,
+      port: freePort,
+      onStdout: (data) => { process.stdout.write(data); },
+      onStderr: (data) => { process.stderr.write(data); },
+      onSpawn: (child) => {
+        process.on('SIGINT', () => {
+          closeWatcher();
+          child.kill('SIGINT');
         });
-      }
-    }
-    if (msg.type === 'init-complete') {
-      if (msg.success) {
-        console.log('FluidCAD initialized successfully.');
-        watcher = createFileWatcher(workspacePath, server);
-
-        const opening = pickOpeningFile(workspacePath);
-        if (opening) {
-          server.send({ type: 'process-file', filePath: opening });
+        process.on('SIGTERM', () => {
+          closeWatcher();
+          child.kill('SIGTERM');
+        });
+      },
+      onReady: (url) => {
+        console.log(`FluidCAD ready at ${url}`);
+        if (opts.open) {
+          open(url).catch((err) => {
+            console.error(`Failed to open browser: ${err.message}`);
+          });
         }
-      } else {
-        console.error(`FluidCAD initialization failed: ${msg.error}`);
-        process.exit(1);
-      }
+      },
+      onInitialized: () => {
+        console.log('FluidCAD initialized successfully.');
+      },
+    });
+  } catch (err) {
+    if (err?.reason === 'exited') {
+      // The engine went away on its own (or on Ctrl-C): mirror its exit code.
+      process.exit(err.exitCode || 0);
     }
-  });
+    if (err?.reason === 'init-failed') {
+      console.error(`FluidCAD initialization failed: ${err.message}`);
+      process.exit(1);
+    }
+    throw err;
+  }
 
-  server.on('exit', (code) => {
-    if (watcher) { watcher.close(); }
+  engine.child.on('exit', (code) => {
+    closeWatcher();
     process.exit(code || 0);
-  });
-
-  process.on('SIGINT', () => {
-    if (watcher) { watcher.close(); }
-    server.kill('SIGINT');
-  });
-
-  process.on('SIGTERM', () => {
-    if (watcher) { watcher.close(); }
-    server.kill('SIGTERM');
   });
 }
 

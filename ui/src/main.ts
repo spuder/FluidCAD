@@ -694,6 +694,9 @@ currentRail = initialRail;
 // Top application bar (logo, workspace, file tabs) and the secondary tool bar
 // below it (host for conditionally-visible tool groups).
 const topBar = new TopBar(container, {
+  beforeLeave: async () => {
+    await editorSurface?.models.saveAllDirty();
+  },
   // A viewport-only host gets no tab affordances: the handler set is absent,
   // which is what removes them.
   tabs: editorSurfaceEnabled ? {

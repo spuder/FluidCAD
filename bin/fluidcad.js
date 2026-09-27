@@ -6,6 +6,7 @@ import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { registerInitCommand } from './commands/init.js';
 import { registerServeCommand } from './commands/serve.js';
+import { registerHubCommand } from './commands/hub.js';
 import { registerMcpCommand } from './commands/mcp.js';
 import { registerPackCommand } from './commands/pack.js';
 import { registerExportCommand } from './commands/export.js';
@@ -22,6 +23,7 @@ const program = new Command()
 
 registerInitCommand(program);
 registerServeCommand(program);
+registerHubCommand(program);
 registerMcpCommand(program);
 registerPackCommand(program);
 registerExportCommand(program);

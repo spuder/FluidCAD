@@ -5,6 +5,12 @@ import type { SceneObjectRender, SerializedAssembly } from '../types';
 export interface TopBarHandlers extends TopBarActionHandlers {
   /** Tab interactions. Absent on a viewport-only host — see {@link TopBar.setFileName}. */
   tabs?: FileTabsHandlers;
+  /**
+   * Runs before the brand link leaves for the host's project picker (see the
+   * `fluidcad-home` meta tag); it saves unsaved buffers so leaving loses
+   * nothing. A rejection keeps the page unless the user chooses to leave.
+   */
+  beforeLeave?: () => Promise<void>;
 }
 
 /**
@@ -34,9 +40,35 @@ export class TopBar {
       'absolute top-0 left-0 right-0 h-12 z-[121] flex items-center gap-2 px-3 ' +
       'panel-bg border-b border-base-content/10 select-none';
 
-    // Logo + wordmark
-    const brand = document.createElement('div');
+    // Logo + wordmark. A host that serves this page as one of several
+    // projects (`fluidcad hub`) names its picker in a `fluidcad-home` meta
+    // tag, and the brand becomes the way back to it.
+    const home = document.querySelector<HTMLMetaElement>('meta[name="fluidcad-home"]')?.content;
+    const brand: HTMLElement = home ? document.createElement('a') : document.createElement('div');
     brand.className = 'flex items-center gap-1.5 shrink-0';
+    if (home && brand instanceof HTMLAnchorElement) {
+      brand.href = home;
+      brand.title = 'All projects';
+      brand.classList.add('cursor-pointer', 'hover:opacity-80');
+      brand.addEventListener('click', (event) => {
+        // Modified clicks (new tab/window) leave this page alone.
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+          return;
+        }
+        event.preventDefault();
+        void (async () => {
+          try {
+            await handlers.beforeLeave?.();
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : String(err);
+            if (!window.confirm(`Saving failed (${reason}). Leave anyway and lose unsaved changes?`)) {
+              return;
+            }
+          }
+          window.location.href = (brand as HTMLAnchorElement).href;
+        })();
+      });
+    }
     brand.innerHTML = `
       <img src="logo.svg" alt="FluidCAD" class="h-8 w-8 shrink-0" />
       <span class="text-[17px] font-bold text-base-content/80 tracking-tight">FluidCAD</span>
