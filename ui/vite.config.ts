@@ -8,6 +8,10 @@ export default defineConfig({
   // (a reverse proxy serving it at /p/<name>/) as well as at the root.
   base: './',
   plugins: [tailwindcss()],
+  define: {
+    // Relative, so the app works behind a path prefix (see src/icon-url.ts).
+    __FLUIDCAD_ICON_BASE__: JSON.stringify('icons/'),
+  },
   server: {
     port: 3200
   },

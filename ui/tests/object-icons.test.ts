@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { UNIQUE_TYPE_ICONS, resolveIconName, DEFAULT_ICON_SRC } from '../src/ui/object-icons';
+import { iconUrl } from '../src/icon-url';
 
 const iconPath = (name: string) =>
   fileURLToPath(new URL(`../public/icons/${name}.png`, import.meta.url));
@@ -39,6 +40,15 @@ describe('icon artwork', () => {
   });
 
   it('has the default icon on disk, since it backstops every missing PNG', () => {
-    expect(existsSync(fileURLToPath(new URL(`../public/${DEFAULT_ICON_SRC}`, import.meta.url)))).toBe(true);
+    expect(DEFAULT_ICON_SRC).toBe(iconUrl('solid'));
+    expect(existsSync(iconPath('solid'))).toBe(true);
+  });
+});
+
+describe('iconUrl', () => {
+  it('builds a relative URL when no build-time base is defined', () => {
+    // vitest runs source without the Vite `define`, so the app's relative
+    // base applies; the library build swaps in an absolute `/icons/`.
+    expect(iconUrl('extrude')).toBe('icons/extrude.png');
   });
 });

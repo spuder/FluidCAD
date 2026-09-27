@@ -8,6 +8,7 @@ import { resolveIconName, ICON_IMG_FALLBACK, CONSTRAINT_KIND_ICONS } from './obj
 import { ShapesPanel } from './shapes-panel';
 import { AccordionSection } from './accordion-section';
 import { RAIL_PANEL_CLASS } from './rail-styles';
+import { iconUrl } from '../icon-url';
 
 function formatDuration(ms: number): string {
   if (ms < 1000) {
@@ -1081,7 +1082,7 @@ export class TimelinePanel {
           ${ICON_CHEVRON_RIGHT}
         </span>
         ${errorDot}
-        <img src="icons/${CONSTRAINT_KIND_ICONS.horizontal}.png" ${ICON_IMG_FALLBACK} class="w-4 h-4 object-contain" alt="" />
+        <img src="${iconUrl(CONSTRAINT_KIND_ICONS.horizontal)}" ${ICON_IMG_FALLBACK} class="w-4 h-4 object-contain" alt="" />
         <span class="truncate">${count} constraint${count === 1 ? '' : 's'}</span>
       </div>
     `;
@@ -1105,7 +1106,7 @@ export class TimelinePanel {
           ${ICON_CHEVRON_RIGHT}
         </span>
         ${errorDot}
-        <img src="icons/${kind.icon}.png" ${ICON_IMG_FALLBACK} class="w-4 h-4 object-contain" alt="" />
+        <img src="${iconUrl(kind.icon)}" ${ICON_IMG_FALLBACK} class="w-4 h-4 object-contain" alt="" />
         <span class="truncate">${kind.label(count)}</span>
       </div>
     `;
@@ -1133,7 +1134,7 @@ export class TimelinePanel {
     const isDropTarget = this.onMoveToPart != null && !this.sketchActive && isTopLevel
       && obj.type === 'part' && obj.sourceLocation != null;
     const name = obj.name || 'Unknown';
-    const iconSrc = obj.type === 'part' ? 'icons/box-blue.png' : `icons/${resolveIconName(obj.uniqueType, obj.type)}.png`;
+    const iconSrc = obj.type === 'part' ? iconUrl('box-blue') : iconUrl(resolveIconName(obj.uniqueType, obj.type));
 
     let itemClass = 'flex items-center gap-1 px-3 py-1.5 cursor-pointer hover:bg-base-content/[0.06] text-sm';
     const indent = TimelinePanel.indentClass(depth);

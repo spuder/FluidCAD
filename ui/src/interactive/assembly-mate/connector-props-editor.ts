@@ -6,6 +6,7 @@ import {
 } from '../../api';
 import type { Viewer } from '../../viewer';
 import type { ConnectorSlotState } from './mate-service';
+import { iconUrl } from '../../icon-url';
 
 const NAME_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
@@ -37,7 +38,7 @@ class ConnectorPropsPanel extends FeaturePanel {
     super(container, {
       id: 'fluidcad-connector-props-panel',
       title: 'Connector',
-      icon: 'icons/mate-connector.png',
+      icon: iconUrl('mate-connector'),
       bodyHtml: `
         <label class="flex flex-col gap-1.5"
           title="The identifier the connector registers under — mates reference it as instance.connectors.<name>">

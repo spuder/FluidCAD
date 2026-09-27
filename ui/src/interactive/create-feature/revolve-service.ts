@@ -25,6 +25,7 @@ import {
   AXIS_CONSUMED_MESSAGE, AxisOption, axisLineShapeIds, axisOptionForLocation, axisOptionForShape,
   axisOptionsSignature, collectAxisOptions, labelWithAxisNames, pickedAxisRef,
 } from './axis-options';
+import { iconUrl } from '../../icon-url';
 
 /**
  * The Revolve dialog on the create rails: a profile sketch swept around an
@@ -86,7 +87,7 @@ export class RevolveFeatureService {
   ) {
     const group = navbar.getGroup('create') ?? navbar.addGroup('create', { visible: false, immune: true });
     this.button = new FeatureButton(group, {
-      icon: 'icons/revolve.png',
+      icon: iconUrl('revolve'),
       label: 'Revolve',
       tip: 'Revolve a sketch around an axis',
       ariaLabel: 'Revolve a sketch around an axis',

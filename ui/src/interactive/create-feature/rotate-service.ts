@@ -22,6 +22,7 @@ import {
   axisOptionsSignature, collectAxisOptions, labelWithAxisNames, pickedAxisRef,
 } from './axis-options';
 import { collectSketchProfiles, sourceChip } from './sketch-profiles';
+import { iconUrl } from '../../icon-url';
 
 /** What the seeding hook hands over when the dialog arms. */
 export type RotateEnterSeed = {
@@ -119,7 +120,7 @@ export class RotateFeatureService {
     // hides while the exclusive sketch toolbar owns the bar.
     const group = navbar.getGroup('transform') ?? navbar.addGroup('transform', { visible: false });
     this.button = new FeatureButton(group, {
-      icon: 'icons/rotate.png',
+      icon: iconUrl('rotate'),
       label: 'Rotate',
       tip: 'Rotate solids',
       ariaLabel: 'Rotate solids around an axis',
