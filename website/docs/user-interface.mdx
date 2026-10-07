@@ -165,6 +165,10 @@ See [Assembly](/docs/assembly/introduction) for the joints and the [Getting star
 
 Every toolbar operation is one edit to the source file, so Undo and Redo step the editor's own history: the first two buttons on the toolbar, <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> (<kbd>Ctrl</kbd>+<kbd>Y</kbd> also redoes; on macOS use <kbd>⌘</kbd>). The keys work in both workbenches with the viewport focused; inside the code editor or a text field they keep their native meaning. The group appears once an editor is attached — the in-page editor, or the VS Code / Neovim extension.
 
+## Command palette
+
+Press <kbd>s</kbd> with the viewport focused, or <kbd>Ctrl</kbd>+<kbd>K</kbd> (<kbd>⌘</kbd>+<kbd>K</kbd> on macOS) from anywhere, to open a searchable list of the commands available right now: the sketch tools while a sketch is open, every feature button the current workbench shows, and Undo/Redo when an editor is attached. Type part of a name — the match is fuzzy, so `ext` finds Extrude — move with <kbd>↑</kbd> / <kbd>↓</kbd> and press <kbd>Enter</kbd> or click a row to run it. Each row shows the command's own shortcut. <kbd>Esc</kbd>, a click outside, or <kbd>Ctrl</kbd>+<kbd>K</kbd> again closes it. The assembly workbench's tools are not listed yet.
+
 ## Editors
 
 The in-page editor is enough for most work: it completes against the engine's own type declarations and shows diagnostics inline. The VS Code and Neovim extensions drive the same server from your editor; see [Editor setup](/docs/installation#editor-setup).
